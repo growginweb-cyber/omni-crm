@@ -9,7 +9,6 @@ const corsHeaders = {
 serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-    // Supabaseの内部特権キーを使って認証をバイパスし、データベースを操作する
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const LINE_ACCESS_TOKEN = Deno.env.get('LINE_ACCESS_TOKEN') ?? ''
@@ -20,7 +19,7 @@ serve(async (req) => {
         const now = new Date().toISOString()
         console.log(`[自動ステップエンジン起動] 現在時刻: ${now}`)
 
-        // 1. 配信予定時刻を過ぎている、かつ「未送信」のステップタスクをデータベースから一斉に拾い上げる
+        // 1. 未送信の予約タスクを取得
         const { data: pendingQueues, error: fetchError } = await supabase
             .from('step_broadcast_queues')
             .select('*, customers(*)')
@@ -37,65 +36,65 @@ serve(async (req) => {
 
                 console.log(`[配信処理開始] 顧客: ${customer.name}, チャネル: ${channel}, ステップ: ${q.step_number}`)
 
-                // 2. 🤖 [超進化] 直書きの文字を廃止！顧客のセグメントとチャネルに一致する自作テンプレートを自動検索
-                const { data: template, error: templateError } = await supabase
-                    .from('broadcast_templates')
-                    .select('*')
-                    .eq('target_segment', customer.segment)
-                    .eq('delivery_channel', channel)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single()
+                let textContent = `【ステップ${q.step_number}】自動追客メッセージです。`
+                let flexJson = null
 
-                // もし自作テンプレートがあればそれを使い、なければフォールバック
-                let textContent = template ? template.content : `【ステップ${q.step_number}】自動追客メッセージです。`
-                let flexJson = template ? template.flex_json : null
+                // 💡 2. 画面で選んだ template_id があれば、自作アセットをデータベースから引っ張る！
+                if (q.template_id) {
+                    const { data: template } = await supabase
+                        .from('broadcast_templates')
+                        .select('*')
+                        .eq('id', q.template_id)
+                        .single()
 
-                // 3. チャネルがLINEで、かつUIDが有効なら、本物のLINEにブチ込む！
+                    if (template) {
+                        textContent = template.content
+                        flexJson = template.flex_json
+                    }
+                }
+
+                let sendStatus = '送信成功'
+
                 if (channel === 'LINE' && customer.line_uid && customer.line_uid !== '未連携') {
-                    console.log(`-> 本物のLINEに送信中: ${customer.line_uid}`)
+                    console.log(`-> LINEに送信中: ${customer.line_uid}`)
 
-                    // Flex Message（カード型）があればFlex、なければただのテキストで送る切り替え
                     const messagePayload = flexJson
-                        ? { type: "flex", altText: "自動ステップ配信", contents: flexJson }
-                        : { type: 'text', text: textContent };
+                        ? { type: "flex", altText: "AI Omni CRMからのメッセージ", contents: flexJson }
+                        : { type: 'text', text: textContent }
 
-                    await fetch('https://api.line.me/v2/bot/message/push', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${LINE_ACCESS_TOKEN}`
-                        },
-                        body: JSON.stringify({
-                            to: customer.line_uid,
-                            messages: [messagePayload] // 以前修正した [ ] で囲む形です
+                    try {
+                        const res = await fetch('https://api.line.me/v2/bot/message/push', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${LINE_ACCESS_TOKEN}`
+                            },
+                            body: JSON.stringify({
+                                to: customer.line_uid,
+                                messages: [messagePayload]
+                            })
                         })
-                    })
-                }
-                // 3. チャネルがLINEで、かつUIDが有効なら、実際にLINEにブチ込む！
-                if (channel === 'LINE' && customer.line_uid && customer.line_uid !== '未連携') {
-                    console.log(`-> 本物のLINEに送信中: ${customer.line_uid}`)
-                    await fetch('https://api.line.me/v2/bot/message/push', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${LINE_ACCESS_TOKEN}`
-                        },
-                        // 💡 messagesの中身を [ ] で囲むように修正します
-                        body: JSON.stringify({
-                            to: customer.line_uid,
-                            messages: [{ type: 'text', text: textContent }] // <- ここを [ ] で囲む
-                        })
-                    })
+
+                        if (!res.ok) {
+                            const errBody = await res.text()
+                            console.error(`[LINE送信失敗] status=${res.status} body=${errBody}`)
+                            sendStatus = '送信失敗'
+                        }
+                    } catch (lineErr) {
+                        console.error(`[LINE送信エラー] ${lineErr.message}`)
+                        sendStatus = '送信失敗'
+                    }
+                } else if (channel !== 'LINE') {
+                    console.log(`-> [${channel}] 送信スキップ（未実装チャネル）`)
+                    sendStatus = '送信スキップ'
                 } else {
-                    // EmailやSMS、またはシミュレーションの場合はログ出力のみ
-                    console.log(`-> [マルチチャネル模擬送信] ${channel}宛てに送信しました: ${textContent}`)
+                    console.log(`-> LINE UID未連携のためスキップ: ${customer.name}`)
+                    sendStatus = '送信スキップ'
                 }
 
-                // 4. 送信ステータスを「送信成功」に更新
                 await supabase
                     .from('step_broadcast_queues')
-                    .update({ status: '送信成功' })
+                    .update({ status: sendStatus })
                     .eq('id', q.id)
             }
         }
