@@ -15,7 +15,7 @@ const crm = useCrm()
 </script>
 
 <template>
-  <div class="h-screen bg-slate-50/80 flex flex-col font-sans text-slate-800 antialiased">
+  <div class="h-screen bg-slate-50/80 flex font-sans text-slate-800 antialiased">
     <AppNav
       v-if="crm.isLoggedIn.value"
       :activeTab="crm.activeTab.value"
@@ -33,7 +33,7 @@ const crm = useCrm()
       @login="crm.handleLogin"
     />
 
-    <template v-else>
+    <div v-else class="flex-1 flex flex-col overflow-hidden">
       <DashboardTab
         v-if="crm.activeTab.value === 'dashboard'"
         :totalStats="crm.totalStats.value"
@@ -116,7 +116,7 @@ const crm = useCrm()
         @update:liffAnswers="crm.liffAnswers.value = $event"
         @submit="crm.handleLiffSubmit"
       />
-    </template>
+    </div>
 
     <CustomerModal
       v-if="crm.isModalOpen.value"
