@@ -4,8 +4,19 @@ import { ref, computed } from 'vue'
 const props = defineProps({
   stepScenarios: Array,
   savedTemplates: Array,
+  stepQueues: Array,
 })
 defineEmits(['addStep'])
+
+const stepStats = (stepNumber) => {
+  const queues = (props.stepQueues || []).filter(q => q.step_number === stepNumber)
+  return {
+    total: queues.length,
+    success: queues.filter(q => q.status === '送信成功').length,
+    pending: queues.filter(q => q.status === '未送信' || q.status === '処理中').length,
+    failed: queues.filter(q => q.status === '送信失敗').length,
+  }
+}
 
 const selectedStepIndex = ref(null)
 
@@ -104,9 +115,26 @@ const filteredTemplates = computed(() => {
               </div>
               <span class="text-[9px] font-mono text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">Step {{ scenario.step_number }}</span>
             </div>
-            <div class="text-[11px] text-slate-600">
+            <div class="text-[11px] text-slate-600 mb-2">
               <span class="font-semibold">コンテンツ:</span>
               <span class="ml-1">{{ templateName(scenario.template_id) }}</span>
+            </div>
+            <div class="flex items-center gap-2 mt-1">
+              <template v-if="stepStats(scenario.step_number).total > 0">
+                <span class="text-[9px] font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-500">
+                  計 {{ stepStats(scenario.step_number).total }}名
+                </span>
+                <span class="text-[9px] font-mono bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200">
+                  ✓ {{ stepStats(scenario.step_number).success }}
+                </span>
+                <span v-if="stepStats(scenario.step_number).pending > 0" class="text-[9px] font-mono bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
+                  ⏳ {{ stepStats(scenario.step_number).pending }}
+                </span>
+                <span v-if="stepStats(scenario.step_number).failed > 0" class="text-[9px] font-mono bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-200">
+                  ✗ {{ stepStats(scenario.step_number).failed }}
+                </span>
+              </template>
+              <span v-else class="text-[9px] text-slate-300">実績なし</span>
             </div>
           </div>
 

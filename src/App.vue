@@ -71,6 +71,7 @@ const crm = useCrm()
         v-else-if="crm.activeTab.value === 'scenarios'"
         :stepScenarios="crm.stepScenarios.value"
         :savedTemplates="crm.savedTemplates.value"
+        :stepQueues="crm.stepQueues.value"
         @addStep="crm.addScenarioStep"
       />
 
