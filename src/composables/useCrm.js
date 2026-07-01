@@ -172,6 +172,13 @@ export function useCrm() {
     }
   }
 
+  const updateCustomerSegment = async ({ id, segment }) => {
+    await supabase.from('customers').update({ segment }).eq('id', id)
+    const c = customers.value.find(c => c.id === id)
+    if (c) c.segment = segment
+    if (selectedCustomer.value?.id === id) selectedCustomer.value = { ...selectedCustomer.value, segment }
+  }
+
   const handleCreateCustomer = async () => {
     if (!newCustomer.value.name || !currentTenantId.value) return
     isSaving.value = true
@@ -618,6 +625,7 @@ export function useCrm() {
     channelStats,
     fetchCustomers,
     handleCreateCustomer,
+    updateCustomerSegment,
     handleSelectCampaign,
     handleSaveFlow,
     handleCreateCampaign,

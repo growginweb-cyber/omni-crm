@@ -62,6 +62,7 @@ const crm = useCrm()
         @update:selectedCustomer="crm.selectedCustomer.value = $event"
         @openModal="crm.isModalOpen.value = true"
         @fetchCustomers="crm.fetchCustomers"
+        @updateSegment="crm.updateCustomerSegment"
       />
 
       <ScenariosTab

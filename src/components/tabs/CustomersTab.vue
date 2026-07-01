@@ -7,7 +7,7 @@ const props = defineProps({
   selectedCustomer: Object,
   stepQueues: Array,
 })
-defineEmits(['update:selectedSegment', 'update:selectedCustomer', 'openModal', 'fetchCustomers'])
+const emit = defineEmits(['update:selectedSegment', 'update:selectedCustomer', 'openModal', 'fetchCustomers', 'updateSegment'])
 
 const searchQuery = ref('')
 
@@ -52,6 +52,7 @@ const formatTime = (dateStr) => {
 }
 
 const segments = ['ALL', '集客最大化タイプ', 'コスト削減タイプ', '未診断']
+const allSegments = ['集客最大化タイプ', 'コスト削減タイプ', '未診断']
 </script>
 
 <template>
@@ -148,9 +149,15 @@ const segments = ['ALL', '集客最大化タイプ', 'コスト削減タイプ',
             <div :class="[avatarColor(selectedCustomer.name), 'w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white']">
               {{ avatarInitial(selectedCustomer.name) }}
             </div>
-            <div>
+            <div class="flex-1 min-w-0">
               <h3 class="text-sm font-bold text-slate-900">{{ selectedCustomer.name }}</h3>
-              <span :class="['inline-block px-2 py-0.5 rounded-md text-[9px] font-bold mt-0.5', segmentStyle(selectedCustomer.segment)]">{{ selectedCustomer.segment || '未診断' }}</span>
+              <select
+                :value="selectedCustomer.segment || '未診断'"
+                @change="emit('updateSegment', { id: selectedCustomer.id, segment: $event.target.value })"
+                :class="['inline-block px-2 py-0.5 rounded-md text-[9px] font-bold mt-0.5 border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-400', segmentStyle(selectedCustomer.segment)]"
+              >
+                <option v-for="s in allSegments" :key="s" :value="s">{{ s }}</option>
+              </select>
             </div>
           </div>
         </div>
