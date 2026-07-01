@@ -10,18 +10,21 @@ import SurveyTab from './components/tabs/SurveyTab.vue'
 import AiContentTab from './components/tabs/AiContentTab.vue'
 import BroadcastTab from './components/tabs/BroadcastTab.vue'
 import UserLiffTab from './components/tabs/UserLiffTab.vue'
+import AnalyticsTab from './components/tabs/AnalyticsTab.vue'
 
 const crm = useCrm()
 </script>
 
 <template>
-  <div class="h-screen bg-slate-50/80 flex font-sans text-slate-800 antialiased">
+  <div class="h-screen bg-[#fbfbfc] flex text-slate-800 antialiased">
     <AppNav
       v-if="crm.isLoggedIn.value"
       :activeTab="crm.activeTab.value"
       :currentTenantId="crm.currentTenantId.value"
       :userEmail="crm.userEmail.value"
+      :selectedChannel="crm.selectedChannel.value"
       @update:activeTab="crm.activeTab.value = $event"
+      @selectChannel="crm.selectedChannel.value = $event"
       @logout="crm.handleLogout"
     />
 
@@ -38,6 +41,15 @@ const crm = useCrm()
         v-if="crm.activeTab.value === 'dashboard'"
         :totalStats="crm.totalStats.value"
         :channelStats="crm.channelStats.value"
+        :broadcastTasks="crm.broadcastTasks.value"
+        :customers="crm.customers.value"
+      />
+
+      <AnalyticsTab
+        v-else-if="crm.activeTab.value === 'analytics'"
+        :broadcastTasks="crm.broadcastTasks.value"
+        :customers="crm.customers.value"
+        :currentTenantId="crm.currentTenantId.value"
       />
 
       <CustomersTab
@@ -64,6 +76,7 @@ const crm = useCrm()
         :surveyCampaigns="crm.surveyCampaigns.value"
         :selectedCampaignId="crm.selectedCampaignId.value"
         :surveyQuestions="crm.surveyQuestions.value"
+        :savedTemplates="crm.savedTemplates.value"
         v-model:newCampaignTitle="crm.newCampaignTitle.value"
         v-model:newQuestionText="crm.newQuestionText.value"
         :isCreatingQuestion="crm.isCreatingQuestion.value"
