@@ -63,6 +63,8 @@ const crm = useCrm()
         @openModal="crm.isModalOpen.value = true"
         @fetchCustomers="crm.fetchCustomers"
         @updateSegment="crm.updateCustomerSegment"
+        @addTag="crm.addCustomerTag"
+        @removeTag="crm.removeCustomerTag"
       />
 
       <ScenariosTab

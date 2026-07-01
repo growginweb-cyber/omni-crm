@@ -176,10 +176,14 @@ async function processUserAnswer(
     for (const cond of conditions) {
       if (!cond.match) continue
       if (text.toLowerCase().includes(cond.match.toLowerCase())) {
-        // セグメント更新
+        // タグ追加 + セグメント更新
+        const newTag = cond.tag
         const newSegment = cond.tag || customer.segment
-        await supabase.from('customers').update({ segment: newSegment }).eq('id', customer.id)
-        console.log(`[タグマッチ] "${text}" → セグメント: ${newSegment}`)
+        const { data: cur } = await supabase.from('customers').select('tags').eq('id', customer.id).single()
+        const existingTags: string[] = cur?.tags || []
+        const updatedTags = existingTags.includes(newTag) ? existingTags : [...existingTags, newTag]
+        await supabase.from('customers').update({ segment: newSegment, tags: updatedTags }).eq('id', customer.id)
+        console.log(`[タグマッチ] "${text}" → タグ: ${newTag}, セグメント: ${newSegment}`)
 
         // マッチしたポートから繋がるノードを実行
         const portIdx = conditions.indexOf(cond)

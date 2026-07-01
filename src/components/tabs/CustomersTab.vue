@@ -7,7 +7,7 @@ const props = defineProps({
   selectedCustomer: Object,
   stepQueues: Array,
 })
-const emit = defineEmits(['update:selectedSegment', 'update:selectedCustomer', 'openModal', 'fetchCustomers', 'updateSegment'])
+const emit = defineEmits(['update:selectedSegment', 'update:selectedCustomer', 'openModal', 'fetchCustomers', 'updateSegment', 'addTag', 'removeTag'])
 
 const searchQuery = ref('')
 
@@ -53,6 +53,14 @@ const formatTime = (dateStr) => {
 
 const segments = ['ALL', '集客最大化タイプ', 'コスト削減タイプ', '未診断']
 const allSegments = ['集客最大化タイプ', 'コスト削減タイプ', '未診断']
+
+const newTag = ref('')
+const addTag = () => {
+  const tag = newTag.value.trim()
+  if (!tag || !props.selectedCustomer) return
+  emit('addTag', { id: props.selectedCustomer.id, tag })
+  newTag.value = ''
+}
 </script>
 
 <template>
@@ -177,6 +185,31 @@ const allSegments = ['集客最大化タイプ', 'コスト削減タイプ', '�
           <div class="flex justify-between items-center text-xs">
             <span class="text-slate-500 font-semibold">登録日</span>
             <span class="text-slate-800">{{ selectedCustomer.created_at ? new Date(selectedCustomer.created_at).toLocaleDateString() : '—' }}</span>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="px-5 py-3 border-b border-slate-200/60">
+          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">タグ</div>
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <span
+              v-for="tag in (selectedCustomer.tags || [])"
+              :key="tag"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100"
+            >
+              {{ tag }}
+              <button @click="emit('removeTag', { id: selectedCustomer.id, tag })" class="text-indigo-300 hover:text-red-500 transition-colors leading-none">✕</button>
+            </span>
+            <span v-if="!(selectedCustomer.tags?.length)" class="text-[10px] text-slate-400">タグなし</span>
+          </div>
+          <div class="flex gap-1.5">
+            <input
+              v-model="newTag"
+              @keydown.enter.prevent="addTag"
+              class="flex-1 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition"
+              placeholder="タグを追加..."
+            />
+            <button @click="addTag" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-700 transition-colors">追加</button>
           </div>
         </div>
       </template>

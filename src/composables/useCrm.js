@@ -180,6 +180,25 @@ export function useCrm() {
     if (selectedCustomer.value?.id === id) selectedCustomer.value = { ...selectedCustomer.value, segment }
   }
 
+  const addCustomerTag = async ({ id, tag }) => {
+    if (!tag?.trim()) return
+    const c = customers.value.find(c => c.id === id)
+    const current = c?.tags || []
+    if (current.includes(tag)) return
+    const tags = [...current, tag]
+    await supabase.from('customers').update({ tags }).eq('id', id)
+    if (c) c.tags = tags
+    if (selectedCustomer.value?.id === id) selectedCustomer.value = { ...selectedCustomer.value, tags }
+  }
+
+  const removeCustomerTag = async ({ id, tag }) => {
+    const c = customers.value.find(c => c.id === id)
+    const tags = (c?.tags || []).filter(t => t !== tag)
+    await supabase.from('customers').update({ tags }).eq('id', id)
+    if (c) c.tags = tags
+    if (selectedCustomer.value?.id === id) selectedCustomer.value = { ...selectedCustomer.value, tags }
+  }
+
   const handleCreateCustomer = async () => {
     if (!newCustomer.value.name || !currentTenantId.value) return
     isSaving.value = true
@@ -632,6 +651,8 @@ export function useCrm() {
     fetchCustomers,
     handleCreateCustomer,
     updateCustomerSegment,
+    addCustomerTag,
+    removeCustomerTag,
     handleSelectCampaign,
     handleSaveFlow,
     handleCreateCampaign,
