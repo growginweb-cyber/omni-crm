@@ -103,6 +103,7 @@ const crm = useCrm()
         @update:templateTitle="crm.templateTitle.value = $event"
         @generate="crm.simulateAIGeneration"
         @save="crm.saveTemplate"
+        @deleteTemplate="crm.deleteTemplate"
       />
 
       <BroadcastTab

@@ -9,7 +9,7 @@ const props = defineProps({
   templateTitle: String,
   savedTemplates: Array,
 })
-const emit = defineEmits(['update:selectedChannel', 'update:aiTargetSegment', 'update:generatedContent', 'update:templateTitle', 'generate', 'save'])
+const emit = defineEmits(['update:selectedChannel', 'update:aiTargetSegment', 'update:generatedContent', 'update:templateTitle', 'generate', 'save', 'deleteTemplate'])
 
 const channels = [
   { id: 'LINE', label: 'LINE', icon: '🟢', color: 'emerald' },
@@ -798,9 +798,10 @@ watch(smsText, (v) => {
             <div class="text-2xl mb-2">📭</div>
             <p class="text-[10px] text-slate-400">{{ selectedChannel }}のテンプレートはありません</p>
           </div>
-          <div v-for="t in channelTemplates" :key="t.id" class="bg-white p-3 rounded-[14px] border border-[#ebedf0]">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-[11px] font-bold text-slate-800 truncate">{{ t.title }}</span>
+          <div v-for="t in channelTemplates" :key="t.id" class="bg-white p-3 rounded-[14px] border border-[#ebedf0] group">
+            <div class="flex items-start justify-between gap-1 mb-1">
+              <span class="text-[11px] font-bold text-slate-800 leading-snug flex-1 min-w-0">{{ t.title }}</span>
+              <button @click="$emit('deleteTemplate', t.id)" class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 w-5 h-5 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 text-[10px]">✕</button>
             </div>
             <p class="text-[9px] text-slate-400 truncate bg-slate-50 p-1.5 rounded font-mono">{{ t.content }}</p>
           </div>

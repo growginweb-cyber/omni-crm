@@ -375,6 +375,12 @@ export function useCrm() {
     }, 300)
   }
 
+  const deleteTemplate = async (id) => {
+    if (!id) return
+    await supabase.from('broadcast_templates').delete().eq('id', id)
+    await fetchTemplates()
+  }
+
   const saveTemplate = async () => {
     if (!generatedContent.value || !currentTenantId.value) return
     await supabase.from('broadcast_templates').insert([
@@ -621,6 +627,7 @@ export function useCrm() {
     addScenarioStep,
     handleLiffSubmit,
     simulateAIGeneration,
+    deleteTemplate,
     saveTemplate,
     handleReserveBroadcast,
     handleExecuteBroadcast,
