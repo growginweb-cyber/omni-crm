@@ -48,6 +48,7 @@ export function useCrm() {
   const surveyCampaigns = ref([])
   const selectedCampaignId = ref('')
   const surveyQuestions = ref([])
+  const flowJson = ref(null)
   const newCampaignTitle = ref('')
   const newQuestionText = ref('')
   const isCreatingQuestion = ref(false)
@@ -133,7 +134,9 @@ export function useCrm() {
       surveyCampaigns.value = data || []
       if (data?.length > 0 && !selectedCampaignId.value) {
         const active = data.find((c) => c.is_active)
-        selectedCampaignId.value = active ? active.id : data[0].id
+        const first = active || data[0]
+        selectedCampaignId.value = first.id
+        flowJson.value = first.flow_json || null
         await fetchQuestionsByCampaign()
       }
     } catch (error) {
@@ -195,6 +198,19 @@ export function useCrm() {
   const handleSelectCampaign = async (id) => {
     selectedCampaignId.value = id
     await fetchQuestionsByCampaign()
+    const camp = surveyCampaigns.value.find(c => c.id === id)
+    flowJson.value = camp?.flow_json || null
+  }
+
+  const handleSaveFlow = async ({ nodes, connections }) => {
+    if (!selectedCampaignId.value) return
+    const json = { nodes, connections }
+    await supabase
+      .from('survey_campaigns')
+      .update({ flow_json: json })
+      .eq('id', selectedCampaignId.value)
+    const idx = surveyCampaigns.value.findIndex(c => c.id === selectedCampaignId.value)
+    if (idx >= 0) surveyCampaigns.value[idx].flow_json = json
   }
 
   const handleCreateCampaign = async () => {
@@ -585,6 +601,7 @@ export function useCrm() {
     surveyCampaigns,
     selectedCampaignId,
     surveyQuestions,
+    flowJson,
     newCampaignTitle,
     newQuestionText,
     isCreatingQuestion,
@@ -596,6 +613,7 @@ export function useCrm() {
     fetchCustomers,
     handleCreateCustomer,
     handleSelectCampaign,
+    handleSaveFlow,
     handleCreateCampaign,
     handleToggleActiveCampaign,
     handleCreateQuestion,

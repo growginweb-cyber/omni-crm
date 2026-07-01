@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   surveyCampaigns: Array,
@@ -9,8 +9,9 @@ const props = defineProps({
   newQuestionText: String,
   isCreatingQuestion: Boolean,
   savedTemplates: Array,
+  flowJson: Object,
 })
-defineEmits(['update:newCampaignTitle', 'update:newQuestionText', 'selectCampaign', 'createCampaign', 'toggleActiveCampaign', 'createQuestion', 'addChoice'])
+const emit = defineEmits(['update:newCampaignTitle', 'update:newQuestionText', 'selectCampaign', 'saveFlow', 'createCampaign', 'toggleActiveCampaign', 'createQuestion', 'addChoice'])
 
 const NODE_W = 180
 
@@ -23,14 +24,35 @@ const nodeTypes = [
   { type: 'cta', label: 'CTA', icon: '🔗', bg: 'bg-indigo-50', border: 'border-indigo-400', accent: 'text-indigo-700' },
 ]
 
-const nodes = ref([
-  { id: 'trigger-1', type: 'trigger', x: 360, y: 40, data: { label: '友だち追加' } },
-])
+const DEFAULT_NODES = [{ id: 'trigger-1', type: 'trigger', x: 360, y: 40, data: { label: '友だち追加' } }]
+
+const nodes = ref(JSON.parse(JSON.stringify(DEFAULT_NODES)))
 const connections = ref([])
 const selectedNodeId = ref(null)
 const canvasRef = ref(null)
 const connectingFrom = ref(null)
 const tempLineEnd = ref(null)
+
+// flowJsonプロップが変わったらキャンバスをリストア
+watch(() => props.flowJson, (val) => {
+  if (val && val.nodes) {
+    nodes.value = JSON.parse(JSON.stringify(val.nodes))
+    connections.value = JSON.parse(JSON.stringify(val.connections || []))
+  } else {
+    nodes.value = JSON.parse(JSON.stringify(DEFAULT_NODES))
+    connections.value = []
+  }
+  selectedNodeId.value = null
+}, { immediate: true })
+
+// debounce保存タイマー
+let saveTimer = null
+const scheduleAutoSave = () => {
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    emit('saveFlow', { nodes: nodes.value, connections: connections.value })
+  }, 1000)
+}
 
 const selectedNode = computed(() => nodes.value.find(n => n.id === selectedNodeId.value))
 const nodeTypeMeta = (type) => nodeTypes.find(t => t.type === type) || nodeTypes[0]
@@ -87,15 +109,17 @@ const addNode = (type) => {
   }
   nodes.value.push({ id, type, x: 360, y: maxY + 80, data: { ...defaults[type] } })
   selectedNodeId.value = id
+  scheduleAutoSave()
 }
 
 const removeNode = (id) => {
   nodes.value = nodes.value.filter(n => n.id !== id)
   connections.value = connections.value.filter(c => c.from !== id && c.to !== id)
   if (selectedNodeId.value === id) selectedNodeId.value = null
+  scheduleAutoSave()
 }
 
-const removeConnection = (ci) => { connections.value.splice(ci, 1) }
+const removeConnection = (ci) => { connections.value.splice(ci, 1); scheduleAutoSave() }
 
 const getPortPos = (node, isOutput, portIndex = 0) => {
   const h = nodeHeight(node)
@@ -145,7 +169,7 @@ const startDrag = (node, e) => {
   const start = canvasCoords(e)
   const ox = start.x - node.x, oy = start.y - node.y
   const onMove = (me) => { const p = canvasCoords(me); node.x = p.x - ox; node.y = p.y - oy }
-  const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+  const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); scheduleAutoSave() }
   document.addEventListener('mousemove', onMove)
   document.addEventListener('mouseup', onUp)
 }
@@ -162,6 +186,7 @@ const startConnect = (nodeId, portIndex, e) => {
       if (toId !== nodeId) {
         connections.value = connections.value.filter(c => !(c.from === nodeId && c.fromPort === (portIndex || 0)))
         connections.value.push({ from: nodeId, fromPort: portIndex || 0, to: toId })
+        scheduleAutoSave()
       }
     }
     connectingFrom.value = null; tempLineEnd.value = null
@@ -171,10 +196,11 @@ const startConnect = (nodeId, portIndex, e) => {
   document.addEventListener('mouseup', onUp)
 }
 
-const addTagCondition = (node) => { node.data.conditions.push({ match: '', tag: '' }) }
+const addTagCondition = (node) => { node.data.conditions.push({ match: '', tag: '' }); scheduleAutoSave() }
 const removeTagCondition = (node, i) => {
   node.data.conditions.splice(i, 1)
   connections.value = connections.value.filter(c => !(c.from === node.id && c.fromPort === i))
+  scheduleAutoSave()
 }
 
 const outputPortCount = (node) => {
