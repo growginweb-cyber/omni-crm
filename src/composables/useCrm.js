@@ -170,6 +170,22 @@ export function useCrm() {
         fetchCustomers(),
         fetchStepQueues(),
       ])
+      // Realtime: step_broadcast_queues の変化を購読
+      supabase
+        .channel('step-queues-changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'step_broadcast_queues',
+          filter: `tenant_id=eq.${data.tenant_id}`,
+        }, () => { fetchStepQueues() })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'broadcast_tasks',
+          filter: `tenant_id=eq.${data.tenant_id}`,
+        }, () => { fetchBroadcastTasks() })
+        .subscribe()
     }
   }
 

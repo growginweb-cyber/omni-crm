@@ -10,17 +10,30 @@ const props = defineProps({
 const emit = defineEmits(['update:selectedSegment', 'update:selectedCustomer', 'openModal', 'fetchCustomers', 'updateSegment', 'addTag', 'removeTag'])
 
 const searchQuery = ref('')
+const tagFilter = ref('')
+
+const allTags = computed(() => {
+  if (!props.customers) return []
+  const set = new Set()
+  props.customers.forEach(c => (c.tags || []).forEach(t => set.add(t)))
+  return [...set].sort()
+})
 
 const filteredCustomers = computed(() => {
   if (!props.customers) return []
-  if (!searchQuery.value) return props.customers
-  const q = searchQuery.value.toLowerCase()
-  return props.customers.filter(
-    (c) =>
+  let list = props.customers
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    list = list.filter(c =>
       (c.name && c.name.toLowerCase().includes(q)) ||
       (c.email && c.email.toLowerCase().includes(q)) ||
       (c.phone && c.phone.includes(q))
-  )
+    )
+  }
+  if (tagFilter.value) {
+    list = list.filter(c => (c.tags || []).includes(tagFilter.value))
+  }
+  return list
 })
 
 const avatarColor = (name) => {
@@ -75,12 +88,16 @@ const addTag = () => {
             <button @click="$emit('openModal')" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 transition-colors">+ 顧客を追加</button>
           </div>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
           <input
             v-model="searchQuery"
             class="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition"
             placeholder="🔍 名前・メールで検索..."
           />
+          <select v-if="allTags.length" v-model="tagFilter" class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition max-w-[130px]">
+            <option value="">タグ絞り込み</option>
+            <option v-for="tag in allTags" :key="tag" :value="tag">🏷 {{ tag }}</option>
+          </select>
         </div>
       </div>
 
