@@ -4,10 +4,11 @@ defineProps({
   selectedTemplateId: String,
   broadcastTitle: String,
   scheduledAt: String,
+  broadcastTargetSegment: String,
   broadcastTasks: Array,
   processingTaskId: String,
 })
-defineEmits(['update:selectedTemplateId', 'update:broadcastTitle', 'update:scheduledAt', 'reserve', 'execute'])
+defineEmits(['update:selectedTemplateId', 'update:broadcastTitle', 'update:scheduledAt', 'update:broadcastTargetSegment', 'reserve', 'execute'])
 
 const statusClass = (status) => {
   if (status === '完了') return 'bg-emerald-50 text-emerald-700'
@@ -61,6 +62,16 @@ const channelIcon = (ch) => {
           <div>
             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">キャンペーン名</label>
             <input :value="broadcastTitle" @input="$emit('update:broadcastTitle', $event.target.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition" placeholder="例: 7月キャンペーン配信">
+          </div>
+
+          <div>
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">対象セグメント</label>
+            <select :value="broadcastTargetSegment" @change="$emit('update:broadcastTargetSegment', $event.target.value)" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition">
+              <option value="ALL">すべての顧客</option>
+              <option value="集客最大化タイプ">集客最大化タイプ</option>
+              <option value="コスト削減タイプ">コスト削減タイプ</option>
+              <option value="未診断">未診断</option>
+            </select>
           </div>
 
           <div>

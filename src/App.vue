@@ -113,11 +113,13 @@ const crm = useCrm()
         :selectedTemplateId="crm.selectedTemplateId.value"
         :broadcastTitle="crm.broadcastTitle.value"
         :scheduledAt="crm.scheduledAt.value"
+        :broadcastTargetSegment="crm.broadcastTargetSegment.value"
         :broadcastTasks="crm.broadcastTasks.value"
         :processingTaskId="crm.processingTaskId.value"
         @update:selectedTemplateId="crm.selectedTemplateId.value = $event"
         @update:broadcastTitle="crm.broadcastTitle.value = $event"
         @update:scheduledAt="crm.scheduledAt.value = $event"
+        @update:broadcastTargetSegment="crm.broadcastTargetSegment.value = $event"
         @reserve="crm.handleReserveBroadcast"
         @execute="crm.handleExecuteBroadcast"
       />

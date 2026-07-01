@@ -41,6 +41,7 @@ export function useCrm() {
   const selectedTemplateId = ref('')
   const broadcastTitle = ref('')
   const scheduledAt = ref('')
+  const broadcastTargetSegment = ref('ALL')
   const isReserving = ref(false)
   const broadcastTasks = ref([])
   const processingTaskId = ref(null)
@@ -432,11 +433,15 @@ export function useCrm() {
       ])
       .select()
       .single()
-    const { data: targetCustomers } = await supabase
+    let customerQuery = supabase
       .from('customers')
       .select('id')
       .eq('tenant_id', currentTenantId.value)
-      .eq('segment', targetTemplate.target_segment)
+    const seg = broadcastTargetSegment.value !== 'ALL'
+      ? broadcastTargetSegment.value
+      : targetTemplate.target_segment
+    if (seg) customerQuery = customerQuery.eq('segment', seg)
+    const { data: targetCustomers } = await customerQuery
     if (targetCustomers?.length > 0) {
       await supabase
         .from('broadcast_queues')
@@ -608,6 +613,7 @@ export function useCrm() {
     selectedTemplateId,
     broadcastTitle,
     scheduledAt,
+    broadcastTargetSegment,
     isReserving,
     broadcastTasks,
     processingTaskId,
