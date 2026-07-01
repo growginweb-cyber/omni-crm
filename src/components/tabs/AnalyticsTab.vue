@@ -40,14 +40,8 @@ const totalDelivered = computed(() => {
   if (!props.broadcastTasks) return 0
   return props.broadcastTasks.reduce((a, t) => a + (t.delivered_count || 0), 0)
 })
-const totalOpened = computed(() => {
-  if (!props.broadcastTasks) return 0
-  return props.broadcastTasks.reduce((a, t) => a + (t.opened_count || 0), 0)
-})
-const totalClicked = computed(() => {
-  if (!props.broadcastTasks) return 0
-  return props.broadcastTasks.reduce((a, t) => a + (t.clicked_count || 0), 0)
-})
+const totalOpened = computed(() => trackingEvents.value.filter(e => e.event_type === 'open').length)
+const totalClicked = computed(() => trackingEvents.value.filter(e => e.event_type === 'click').length)
 
 const deliveryRate = computed(() => totalSent.value ? Math.round((totalDelivered.value / totalSent.value) * 100) : 0)
 const openRate = computed(() => totalDelivered.value ? Math.round((totalOpened.value / totalDelivered.value) * 100) : 0)
@@ -69,8 +63,9 @@ const channelBreakdown = computed(() => {
     })
     const sent = tasks.reduce((a, t) => a + (t.sent_count || 0), 0)
     const delivered = tasks.reduce((a, t) => a + (t.delivered_count || 0), 0)
-    const opened = tasks.reduce((a, t) => a + (t.opened_count || 0), 0)
-    const clicked = tasks.reduce((a, t) => a + (t.clicked_count || 0), 0)
+    const chEvents = trackingEvents.value.filter(e => e.channel === ch)
+    const opened = chEvents.filter(e => e.event_type === 'open').length
+    const clicked = chEvents.filter(e => e.event_type === 'click').length
     return { channel: ch, sent, delivered, opened, clicked, campaigns: tasks.length }
   })
 })
@@ -86,12 +81,18 @@ const campaignPerformance = computed(() => {
   return props.broadcastTasks
     .filter(t => t.status === '完了' || t.status === '一部失敗')
     .slice(0, 10)
-    .map(t => ({
-      ...t,
-      channel: t.delivery_channel || t.broadcast_templates?.delivery_channel,
-      openRate: t.delivered_count ? Math.round((t.opened_count / t.delivered_count) * 100) : 0,
-      clickRate: t.opened_count ? Math.round((t.clicked_count / t.opened_count) * 100) : 0,
-    }))
+    .map(t => {
+      const taskEvents = trackingEvents.value.filter(e => e.broadcast_task_id === t.id)
+      const opened = taskEvents.filter(e => e.event_type === 'open').length
+      const clicked = taskEvents.filter(e => e.event_type === 'click').length
+      const delivered = t.delivered_count || 0
+      return {
+        ...t,
+        channel: t.delivery_channel || t.broadcast_templates?.delivery_channel,
+        openRate: delivered ? Math.round((opened / delivered) * 100) : 0,
+        clickRate: opened ? Math.round((clicked / opened) * 100) : 0,
+      }
+    })
 })
 
 const recentEvents = computed(() => trackingEvents.value.slice(0, 20))
