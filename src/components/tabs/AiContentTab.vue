@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { supabase } from '../../lib/supabase'
 
 const props = defineProps({
   selectedChannel: String,
@@ -234,6 +235,35 @@ watch(smsText, (v) => {
     emit('update:generatedContent', v)
   }
 })
+
+// LINEテスト送信
+const testLineUid = ref('')
+const isSendingTest = ref(false)
+const testSendResult = ref('')
+
+const sendLineTest = async () => {
+  const uid = testLineUid.value.trim()
+  if (!uid) return
+  isSendingTest.value = true
+  testSendResult.value = ''
+  try {
+    const textMsg = lineBlocks.value.map(b => {
+      if (b.type === 'text') return b.text
+      if (b.type === 'image') return `[画像: ${b.url || '未設定'}]`
+      if (b.type === 'button') return `[ボタン: ${b.label}]`
+      return ''
+    }).join('\n')
+    const { data, error } = await supabase.functions.invoke('send-line-message', {
+      body: { line_uid: uid, text_content: textMsg || 'テスト送信' }
+    })
+    testSendResult.value = error ? `❌ ${error.message}` : '✅ 送信しました'
+  } catch (e) {
+    testSendResult.value = `❌ ${e.message}`
+  } finally {
+    isSendingTest.value = false
+    setTimeout(() => { testSendResult.value = '' }, 4000)
+  }
+}
 </script>
 
 <template>
@@ -418,12 +448,19 @@ watch(smsText, (v) => {
           </div>
 
           <!-- Save bar -->
-          <div class="px-5 py-3 border-t border-slate-200/60 bg-white flex items-center justify-between shrink-0">
-            <select :value="aiTargetSegment" @change="$emit('update:aiTargetSegment', $event.target.value)" class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white">
-              <option value="集客最大化タイプ">集客最大化タイプ</option>
-              <option value="コスト削減タイプ">コスト削減タイプ</option>
-            </select>
-            <button @click="$emit('save')" class="rounded-lg bg-emerald-600 px-4 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-40">テンプレートとして保存</button>
+          <div class="px-5 py-3 border-t border-slate-200/60 bg-white shrink-0 space-y-2">
+            <div class="flex items-center gap-2">
+              <input v-model="testLineUid" class="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition font-mono" placeholder="LINE UID でテスト送信..." />
+              <button @click="sendLineTest" :disabled="!testLineUid || isSendingTest" class="rounded-lg bg-emerald-100 text-emerald-700 px-3 py-1.5 text-[10px] font-bold hover:bg-emerald-200 transition-colors disabled:opacity-40 whitespace-nowrap">{{ isSendingTest ? '送信中...' : 'テスト送信' }}</button>
+            </div>
+            <div v-if="testSendResult" class="text-[10px] font-bold" :class="testSendResult.startsWith('✅') ? 'text-emerald-600' : 'text-red-500'">{{ testSendResult }}</div>
+            <div class="flex items-center justify-between">
+              <select :value="aiTargetSegment" @change="$emit('update:aiTargetSegment', $event.target.value)" class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white">
+                <option value="集客最大化タイプ">集客最大化タイプ</option>
+                <option value="コスト削減タイプ">コスト削減タイプ</option>
+              </select>
+              <button @click="$emit('save')" class="rounded-lg bg-emerald-600 px-4 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700 transition-colors">テンプレートとして保存</button>
+            </div>
           </div>
         </div>
 
