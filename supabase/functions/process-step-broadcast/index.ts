@@ -15,6 +15,20 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    function buildTrackPixelUrl(params: Record<string, string | undefined>) {
+        const qs = new URLSearchParams()
+        Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
+        return `${supabaseUrl}/functions/v1/track?${qs.toString()}`
+    }
+
+    function rewriteUrlsForTracking(content: string, params: Record<string, string | undefined>) {
+        const host = new URL(supabaseUrl).host
+        return content.replace(/https?:\/\/[^\s<>"')\]]+/g, (match: string) => {
+            if (match.includes(host)) return match
+            return buildTrackPixelUrl({ ...params, t: 'click', url: match })
+        })
+    }
+
     try {
         const now = new Date().toISOString()
         console.log(`[自動ステップエンジン起動] 現在時刻: ${now}`)
@@ -51,6 +65,21 @@ serve(async (req) => {
                         textContent = template.content
                         flexJson = template.flex_json
                     }
+                }
+
+                const trackParams = {
+                    tid: q.tenant_id,
+                    cid: customer.id,
+                    sid: q.id,
+                    ch: channel,
+                }
+
+                if (channel === 'Email') {
+                    textContent = rewriteUrlsForTracking(textContent, trackParams)
+                    const pixelUrl = buildTrackPixelUrl({ ...trackParams, t: 'open' })
+                    textContent += `<img src="${pixelUrl}" width="1" height="1" style="display:none" alt="" />`
+                } else {
+                    textContent = rewriteUrlsForTracking(textContent, trackParams)
                 }
 
                 let sendStatus = '送信成功'

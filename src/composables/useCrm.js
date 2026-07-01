@@ -1,6 +1,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { sendLineMessage, simulateChannelDelivery } from '../lib/broadcast'
+import { injectEmailTracking, rewriteUrls, buildSmsContent } from '../lib/tracking'
 
 export function useCrm() {
   const activeTab = ref('dashboard')
@@ -445,11 +446,28 @@ export function useCrm() {
       if (queues && queues.length > 0) {
         for (const q of queues) {
           try {
+            const trackingParams = {
+              tenantId: currentTenantId.value,
+              customerId: q.customer_id,
+              taskId: taskId,
+              queueId: q.id,
+              channel,
+            }
+
+            let trackedContent = template.content
+            if (channel === 'Email') {
+              trackedContent = injectEmailTracking(template.content, trackingParams)
+            } else if (channel === 'SMS') {
+              trackedContent = buildSmsContent(template.content, trackingParams)
+            } else if (channel === 'LINE') {
+              trackedContent = rewriteUrls(template.content, trackingParams)
+            }
+
             if (channel === 'LINE' && q.customers?.line_uid && q.customers.line_uid !== '未連携') {
               await sendLineMessage(supabase, {
                 lineUid: q.customers.line_uid,
                 flexJson: template.flex_json,
-                textContent: template.content,
+                textContent: trackedContent,
               })
             } else {
               await simulateChannelDelivery(channel)
@@ -481,8 +499,8 @@ export function useCrm() {
           status: taskStatus,
           sent_count: successCount,
           delivered_count: successCount,
-          opened_count: Math.floor(successCount * 0.6),
-          clicked_count: Math.floor(successCount * 0.2),
+          opened_count: 0,
+          clicked_count: 0,
         })
         .eq('id', taskId)
 
