@@ -34,6 +34,7 @@ export function useCrm() {
   const generatedContent = ref('')
   const generatedImageUrl = ref('')
   const generatedFlexJson = ref(null)
+  const generatedEmailHtml = ref('')
   const emailSubject = ref('')
   const templateTitle = ref('')
   const savedTemplates = ref([])
@@ -431,6 +432,7 @@ export function useCrm() {
         tenant_id: currentTenantId.value,
         title: templateTitle.value,
         content: generatedContent.value,
+        html_content: generatedEmailHtml.value || null,
         image_url: generatedImageUrl.value || null,
         flex_json: generatedFlexJson.value || null,
         email_subject: emailSubject.value || null,
@@ -443,6 +445,7 @@ export function useCrm() {
     generatedContent.value = ''
     generatedImageUrl.value = ''
     generatedFlexJson.value = null
+    generatedEmailHtml.value = ''
     emailSubject.value = ''
   }
 
@@ -523,9 +526,10 @@ export function useCrm() {
               channel,
             }
 
+            const emailSource = template.html_content || template.content
             let trackedContent = template.content
             if (channel === 'Email') {
-              trackedContent = injectEmailTracking(template.content, trackingParams)
+              trackedContent = injectEmailTracking(emailSource, trackingParams)
             } else if (channel === 'SMS') {
               trackedContent = buildSmsContent(template.content, trackingParams)
             } else if (channel === 'LINE') {
@@ -642,6 +646,7 @@ export function useCrm() {
     isGenerating,
     generatedContent,
     generatedImageUrl,
+    generatedEmailHtml,
     aiPurpose,
     templateTitle,
     savedTemplates,

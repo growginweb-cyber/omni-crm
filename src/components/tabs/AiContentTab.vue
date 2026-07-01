@@ -10,7 +10,7 @@ const props = defineProps({
   templateTitle: String,
   savedTemplates: Array,
 })
-const emit = defineEmits(['update:selectedChannel', 'update:aiTargetSegment', 'update:generatedContent', 'update:templateTitle', 'generate', 'save', 'deleteTemplate'])
+const emit = defineEmits(['update:selectedChannel', 'update:aiTargetSegment', 'update:generatedContent', 'update:generatedEmailHtml', 'update:templateTitle', 'generate', 'save', 'deleteTemplate'])
 
 const channels = [
   { id: 'LINE', label: 'LINE', icon: '🟢', color: 'emerald' },
@@ -234,6 +234,10 @@ watch(smsText, (v) => {
   if (props.selectedChannel === 'SMS') {
     emit('update:generatedContent', v)
   }
+})
+
+watch(emailPreviewHtml, (v) => {
+  emit('update:generatedEmailHtml', v)
 })
 
 // LINEテスト送信
