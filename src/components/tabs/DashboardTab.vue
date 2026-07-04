@@ -151,7 +151,7 @@ const channelRow = (ch) => {
           <div class="text-[10px] font-bold text-[#9097a1] uppercase tracking-wider mb-4">チャネル別 メッセージ数</div>
           <!-- Chart -->
           <div class="flex items-end gap-[6px] h-[100px]">
-            <div v-for="bar in barData()" :key="bar.day" class="flex-1 flex flex-col justify-end gap-0">
+            <div v-for="bar in barData()" :key="bar.day" class="flex-1 h-full flex flex-col justify-end gap-0">
               <div :style="{ height: bar.sms + '%', background: '#8B5CF6', minHeight: bar.sms > 0 ? '2px' : '0' }" class="w-full rounded-t-[2px]"></div>
               <div :style="{ height: bar.email + '%', background: '#3B6EF5', minHeight: bar.email > 0 ? '2px' : '0' }" class="w-full"></div>
               <div :style="{ height: bar.line + '%', background: '#06C755', minHeight: bar.line > 0 ? '2px' : '0' }" class="w-full rounded-b-[2px]"></div>
@@ -164,15 +164,15 @@ const channelRow = (ch) => {
           <!-- Legend -->
           <div class="flex items-center gap-4 mt-4">
             <div class="flex items-center gap-1.5">
-              <div class="w-2.5 h-2.5 rounded-[2px]" style="background:#06C755"></div>
+              <div class="w-[9px] h-[9px] rounded-[2px]" style="background:#06C755"></div>
               <span class="text-[10px] text-slate-500">LINE</span>
             </div>
             <div class="flex items-center gap-1.5">
-              <div class="w-2.5 h-2.5 rotate-45" style="background:#3B6EF5;width:8px;height:8px;"></div>
-              <span class="text-[10px] text-slate-500">Email</span>
+              <div class="w-[9px] h-[9px] rounded-[2px]" style="background:#3B6EF5"></div>
+              <span class="text-[10px] text-slate-500">メール</span>
             </div>
             <div class="flex items-center gap-1.5">
-              <div class="w-2.5 h-2.5 rounded-full" style="background:#8B5CF6"></div>
+              <div class="w-[9px] h-[9px] rounded-[2px]" style="background:#8B5CF6"></div>
               <span class="text-[10px] text-slate-500">SMS</span>
             </div>
           </div>
