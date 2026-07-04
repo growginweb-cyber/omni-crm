@@ -72,7 +72,12 @@ const crm = useCrm()
         :stepScenarios="crm.stepScenarios.value"
         :savedTemplates="crm.savedTemplates.value"
         :stepQueues="crm.stepQueues.value"
+        :stepAiPrompt="crm.stepAiPrompt.value"
+        :stepAiResult="crm.stepAiResult.value"
+        :stepAiLoading="crm.stepAiLoading.value"
         @addStep="crm.addScenarioStep"
+        @update:stepAiPrompt="crm.stepAiPrompt.value = $event"
+        @generateStepContent="crm.generateStepContent"
       />
 
       <SurveyTab

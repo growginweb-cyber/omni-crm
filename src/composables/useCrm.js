@@ -59,6 +59,26 @@ export function useCrm() {
   const liffAnswers = ref({})
   const isLiffSubmitting = ref(false)
 
+  const stepAiPrompt = ref('')
+  const stepAiResult = ref('')
+  const stepAiLoading = ref(false)
+
+  const generateStepContent = async ({ channel, segment, prompt }) => {
+    stepAiLoading.value = true
+    stepAiResult.value = ''
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-generate', {
+        body: { prompt, channel, segment },
+      })
+      if (error) throw error
+      stepAiResult.value = data.content || ''
+    } catch (e) {
+      stepAiResult.value = `エラー: ${e.message}`
+    } finally {
+      stepAiLoading.value = false
+    }
+  }
+
   const totalStats = computed(() => {
     if (!broadcastTasks.value || broadcastTasks.value.length === 0) {
       return { sent: 0, delivered: 0, opened: 0, clicked: 0 }
@@ -689,5 +709,9 @@ export function useCrm() {
     handleExecuteBroadcast,
     handleLogin,
     handleLogout,
+    stepAiPrompt,
+    stepAiResult,
+    stepAiLoading,
+    generateStepContent,
   }
 }

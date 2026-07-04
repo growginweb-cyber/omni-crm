@@ -5,8 +5,11 @@ const props = defineProps({
   stepScenarios: Array,
   savedTemplates: Array,
   stepQueues: Array,
+  stepAiPrompt: String,
+  stepAiResult: String,
+  stepAiLoading: Boolean,
 })
-defineEmits(['addStep'])
+defineEmits(['addStep', 'update:stepAiPrompt', 'generateStepContent'])
 
 const stepStats = (stepNumber) => {
   const queues = (props.stepQueues || []).filter(q => q.step_number === stepNumber)
@@ -232,6 +235,27 @@ const filteredTemplates = computed(() => {
               <option>コスト削減タイプ</option>
               <option>未診断</option>
             </select>
+          </div>
+
+          <!-- AI content generation -->
+          <div class="border-t border-[#ebedf0] pt-4">
+            <label class="text-[10px] font-bold text-[#9097a1] uppercase tracking-wider block mb-2">✨ AIコンテンツ生成</label>
+            <textarea
+              :value="stepAiPrompt"
+              @input="$emit('update:stepAiPrompt', $event.target.value)"
+              rows="3"
+              class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition"
+              placeholder="例: 診断後のフォローアップメッセージを作成して"
+            ></textarea>
+            <button
+              @click="$emit('generateStepContent', { channel: selectedStep.delivery_channel, segment: selectedStep.segment, prompt: stepAiPrompt })"
+              :disabled="stepAiLoading || !stepAiPrompt"
+              class="w-full mt-2 py-2 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <span v-if="stepAiLoading" class="animate-spin">⟳</span>
+              <span>{{ stepAiLoading ? '生成中...' : '✨ AI生成' }}</span>
+            </button>
+            <div v-if="stepAiResult" class="mt-3 bg-[#f7f8fa] rounded-[10px] p-3 text-[11px] text-slate-700 whitespace-pre-wrap border border-[#ebedf0]">{{ stepAiResult }}</div>
           </div>
         </div>
       </template>
