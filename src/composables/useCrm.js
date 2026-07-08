@@ -63,6 +63,162 @@ export function useCrm() {
   const stepAiResult = ref('')
   const stepAiLoading = ref(false)
 
+  // --- タグ・セグメント ---
+  const savedSegments = ref([])
+  const fetchSavedSegments = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('saved_segments')
+      .select('*')
+      .eq('tenant_id', currentTenantId.value)
+      .order('created_at', { ascending: false })
+    savedSegments.value = data || []
+  }
+  const createSavedSegment = async ({ name, segmentFilter, tagFilter }) => {
+    if (!name?.trim() || !currentTenantId.value) return
+    await supabase.from('saved_segments').insert([{
+      tenant_id: currentTenantId.value,
+      name,
+      segment_filter: segmentFilter || null,
+      tag_filter: tagFilter || [],
+    }])
+    await fetchSavedSegments()
+  }
+  const deleteSavedSegment = async (id) => {
+    await supabase.from('saved_segments').delete().eq('id', id)
+    savedSegments.value = savedSegments.value.filter(s => s.id !== id)
+  }
+
+  // --- カレンダー ---
+  const calendarEvents = ref([])
+  const calendarMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const fetchCalendarEvents = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('tenant_id', currentTenantId.value)
+      .order('event_date', { ascending: true })
+    calendarEvents.value = data || []
+  }
+  const createCalendarEvent = async ({ title, eventDate, eventType }) => {
+    if (!title?.trim() || !eventDate || !currentTenantId.value) return
+    await supabase.from('calendar_events').insert([{
+      tenant_id: currentTenantId.value,
+      title,
+      event_date: eventDate,
+      event_type: eventType || '予約',
+    }])
+    await fetchCalendarEvents()
+  }
+  const deleteCalendarEvent = async (id) => {
+    await supabase.from('calendar_events').delete().eq('id', id)
+    calendarEvents.value = calendarEvents.value.filter(e => e.id !== id)
+  }
+
+  // --- 自動応答 ---
+  const autoreplyRules = ref([])
+  const fetchAutoreplyRules = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('autoreply_rules')
+      .select('*')
+      .eq('tenant_id', currentTenantId.value)
+      .order('created_at', { ascending: false })
+    autoreplyRules.value = data || []
+  }
+  const createAutoreplyRule = async ({ keyword, matchType, replyContent, channel }) => {
+    if (!keyword?.trim() || !currentTenantId.value) return
+    await supabase.from('autoreply_rules').insert([{
+      tenant_id: currentTenantId.value,
+      keyword,
+      match_type: matchType || '部分一致',
+      reply_content: replyContent || '',
+      channel: channel || 'LINE',
+    }])
+    await fetchAutoreplyRules()
+  }
+  const toggleAutoreplyRule = async ({ id, enabled }) => {
+    await supabase.from('autoreply_rules').update({ enabled }).eq('id', id)
+    const r = autoreplyRules.value.find(r => r.id === id)
+    if (r) r.enabled = enabled
+  }
+  const deleteAutoreplyRule = async (id) => {
+    await supabase.from('autoreply_rules').delete().eq('id', id)
+    autoreplyRules.value = autoreplyRules.value.filter(r => r.id !== id)
+  }
+
+  // --- 受信トレイ ---
+  const conversations = ref([])
+  const selectedConversationId = ref(null)
+  const inboxMessages = ref([])
+  const inboxDraft = ref('')
+  const isSendingInbox = ref(false)
+
+  const selectedConversation = computed(() =>
+    conversations.value.find(c => c.id === selectedConversationId.value) || null
+  )
+
+  const fetchConversations = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('conversations')
+      .select('*, customers(name, line_uid, email, phone, segment, tags)')
+      .eq('tenant_id', currentTenantId.value)
+      .order('last_message_at', { ascending: false })
+    conversations.value = data || []
+    if (!selectedConversationId.value && conversations.value.length > 0) {
+      await selectConversation(conversations.value[0].id)
+    }
+  }
+
+  const fetchInboxMessages = async (conversationId) => {
+    if (!conversationId) return
+    const { data } = await supabase
+      .from('inbox_messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+    inboxMessages.value = data || []
+  }
+
+  const selectConversation = async (conversationId) => {
+    selectedConversationId.value = conversationId
+    await fetchInboxMessages(conversationId)
+    const conv = conversations.value.find(c => c.id === conversationId)
+    if (conv?.unread) {
+      await supabase.from('conversations').update({ unread: false }).eq('id', conversationId)
+      conv.unread = false
+    }
+  }
+
+  const sendInboxMessage = async () => {
+    const conv = selectedConversation.value
+    if (!conv || !inboxDraft.value.trim() || !currentTenantId.value) return
+    isSendingInbox.value = true
+    try {
+      const text = inboxDraft.value
+      if (conv.channel === 'LINE' && conv.customers?.line_uid && conv.customers.line_uid !== '未連携') {
+        await sendLineMessage(supabase, { lineUid: conv.customers.line_uid, textContent: text })
+      }
+      await supabase.from('inbox_messages').insert([{
+        tenant_id: currentTenantId.value,
+        conversation_id: conv.id,
+        direction: 'outbound',
+        channel: conv.channel,
+        content: text,
+      }])
+      await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conv.id)
+      inboxDraft.value = ''
+      await fetchInboxMessages(conv.id)
+      await fetchConversations()
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      isSendingInbox.value = false
+    }
+  }
+
   const generateStepContent = async ({ channel, segment, prompt }) => {
     stepAiLoading.value = true
     stepAiResult.value = ''
@@ -190,6 +346,10 @@ export function useCrm() {
         fetchCampaigns(),
         fetchCustomers(),
         fetchStepQueues(),
+        fetchSavedSegments(),
+        fetchCalendarEvents(),
+        fetchAutoreplyRules(),
+        fetchConversations(),
       ])
       // Realtime: step_broadcast_queues の変化を購読
       supabase
@@ -206,6 +366,27 @@ export function useCrm() {
           table: 'broadcast_tasks',
           filter: `tenant_id=eq.${data.tenant_id}`,
         }, () => { fetchBroadcastTasks() })
+        .subscribe()
+
+      // Realtime: 受信トレイの会話・メッセージ
+      supabase
+        .channel('inbox-changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+          filter: `tenant_id=eq.${data.tenant_id}`,
+        }, () => { fetchConversations() })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'inbox_messages',
+          filter: `tenant_id=eq.${data.tenant_id}`,
+        }, (payload) => {
+          if (payload.new?.conversation_id === selectedConversationId.value) {
+            fetchInboxMessages(selectedConversationId.value)
+          }
+        })
         .subscribe()
     }
   }
@@ -713,5 +894,24 @@ export function useCrm() {
     stepAiResult,
     stepAiLoading,
     generateStepContent,
+    savedSegments,
+    createSavedSegment,
+    deleteSavedSegment,
+    calendarEvents,
+    calendarMonth,
+    createCalendarEvent,
+    deleteCalendarEvent,
+    autoreplyRules,
+    createAutoreplyRule,
+    toggleAutoreplyRule,
+    deleteAutoreplyRule,
+    conversations,
+    selectedConversationId,
+    selectedConversation,
+    inboxMessages,
+    inboxDraft,
+    isSendingInbox,
+    selectConversation,
+    sendInboxMessage,
   }
 }

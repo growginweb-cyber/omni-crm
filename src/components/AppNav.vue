@@ -14,14 +14,17 @@ const navGroups = [
     label: 'ホーム',
     items: [
       { id: 'dashboard', label: 'ダッシュボード', icon: '📊' },
+      { id: 'inbox', label: '受信トレイ', icon: '✉️' },
       { id: 'analytics', label: 'MAアナリティクス', icon: '📈' },
+      { id: 'calendar', label: 'カレンダー', icon: '📅' },
     ],
   },
   {
     label: '配信',
     items: [
       { id: 'broadcast', label: 'ショット配信', icon: '🚀' },
-      { id: 'scenarios', label: 'ステップ配信', icon: '⚙️' },
+      { id: 'scenarios', label: 'シナリオ格納庫', icon: '🗂️' },
+      { id: 'autoreply', label: '自動応答', icon: '⚡' },
       {
         id: 'ai-content', label: 'コンテンツ作成', icon: '✨',
         children: [
@@ -42,6 +45,7 @@ const navGroups = [
     label: '顧客管理',
     items: [
       { id: 'customers', label: '顧客管理', icon: '👥' },
+      { id: 'tags', label: 'タグ・セグメント', icon: '🏷️' },
     ],
   },
   {

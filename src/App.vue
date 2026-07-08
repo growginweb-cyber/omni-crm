@@ -11,6 +11,10 @@ import AiContentTab from './components/tabs/AiContentTab.vue'
 import BroadcastTab from './components/tabs/BroadcastTab.vue'
 import UserLiffTab from './components/tabs/UserLiffTab.vue'
 import AnalyticsTab from './components/tabs/AnalyticsTab.vue'
+import InboxTab from './components/tabs/InboxTab.vue'
+import CalendarTab from './components/tabs/CalendarTab.vue'
+import AutoReplyTab from './components/tabs/AutoReplyTab.vue'
+import TagsSegmentsTab from './components/tabs/TagsSegmentsTab.vue'
 
 const crm = useCrm()
 </script>
@@ -45,11 +49,48 @@ const crm = useCrm()
         :customers="crm.customers.value"
       />
 
+      <InboxTab
+        v-else-if="crm.activeTab.value === 'inbox'"
+        :conversations="crm.conversations.value"
+        :selectedConversationId="crm.selectedConversationId.value"
+        :selectedConversation="crm.selectedConversation.value"
+        :inboxMessages="crm.inboxMessages.value"
+        :inboxDraft="crm.inboxDraft.value"
+        :isSendingInbox="crm.isSendingInbox.value"
+        @selectConversation="crm.selectConversation"
+        @update:inboxDraft="crm.inboxDraft.value = $event"
+        @send="crm.sendInboxMessage"
+      />
+
       <AnalyticsTab
         v-else-if="crm.activeTab.value === 'analytics'"
         :broadcastTasks="crm.broadcastTasks.value"
         :customers="crm.customers.value"
         :currentTenantId="crm.currentTenantId.value"
+      />
+
+      <CalendarTab
+        v-else-if="crm.activeTab.value === 'calendar'"
+        :calendarEvents="crm.calendarEvents.value"
+        :broadcastTasks="crm.broadcastTasks.value"
+        @createEvent="crm.createCalendarEvent"
+        @deleteEvent="crm.deleteCalendarEvent"
+      />
+
+      <AutoReplyTab
+        v-else-if="crm.activeTab.value === 'autoreply'"
+        :autoreplyRules="crm.autoreplyRules.value"
+        @createRule="crm.createAutoreplyRule"
+        @toggleRule="crm.toggleAutoreplyRule"
+        @deleteRule="crm.deleteAutoreplyRule"
+      />
+
+      <TagsSegmentsTab
+        v-else-if="crm.activeTab.value === 'tags'"
+        :customers="crm.customers.value"
+        :savedSegments="crm.savedSegments.value"
+        @createSegment="crm.createSavedSegment"
+        @deleteSegment="crm.deleteSavedSegment"
       />
 
       <CustomersTab
