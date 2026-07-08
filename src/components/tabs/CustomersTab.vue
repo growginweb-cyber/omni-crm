@@ -44,18 +44,24 @@ const avatarColor = (name) => {
 
 const avatarInitial = (name) => (name || '?').charAt(0)
 
-const segmentStyle = (seg) => {
-  if (seg === '集客最大化タイプ') return 'bg-emerald-50 text-emerald-700'
-  if (seg === 'コスト削減タイプ') return 'bg-amber-50 text-amber-700'
-  if (seg === '未診断') return 'bg-slate-100 text-slate-500'
-  return 'bg-indigo-50 text-indigo-700'
+// Presentation-only: status-dot colors per segment (Unibox pattern)
+const segmentDot = (seg) => {
+  if (seg === '集客最大化タイプ') return { text: 'text-[#06914a]', dot: 'bg-[#06914a]' }
+  if (seg === 'コスト削減タイプ') return { text: 'text-[#b45309]', dot: 'bg-[#b45309]' }
+  if (seg === '未診断' || !seg) return { text: 'text-[#9097a1]', dot: 'bg-[#9097a1]' }
+  return { text: 'text-[#4f46e5]', dot: 'bg-[#4f46e5]' }
 }
 
+// Presentation-only: linked channel helpers
+const hasLine = (c) => !!(c?.line_uid && c.line_uid !== '未連携')
+const hasEmail = (c) => !!c?.email
+const hasPhone = (c) => !!c?.phone
+
 const statusClass = (status) => {
-  if (status === '送信成功') return 'bg-emerald-50 text-emerald-700'
-  if (status === '送信失敗') return 'bg-red-50 text-red-700'
-  if (status === '送信スキップ') return 'bg-slate-100 text-slate-500'
-  return 'bg-amber-50 text-amber-700 animate-pulse'
+  if (status === '送信成功') return 'text-[#06914a] bg-[#06914a]/10'
+  if (status === '送信失敗') return 'text-red-600 bg-red-50'
+  if (status === '送信スキップ') return 'text-[#9097a1] bg-[#f1f2f4]'
+  return 'text-[#b45309] bg-amber-50 animate-pulse'
 }
 
 const formatTime = (dateStr) => {
@@ -77,24 +83,28 @@ const addTag = () => {
 </script>
 
 <template>
-  <div class="flex-1 flex overflow-hidden">
+  <div class="flex-1 flex overflow-hidden bg-[#fbfbfc]">
     <!-- Left: Customer list -->
-    <main class="flex-[3] flex flex-col border-r border-slate-200/60 bg-white overflow-hidden">
-      <!-- Toolbar -->
-      <div class="px-5 py-4 border-b border-slate-200/60 shrink-0">
+    <main class="flex-[3] flex flex-col border-r border-[#ebedf0] overflow-hidden">
+      <!-- Header -->
+      <div class="sticky top-0 z-10 bg-[#fbfbfc] border-b border-[#ebedf0] px-7 py-[18px] shrink-0">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="text-lg font-bold text-slate-900">顧客管理</h2>
-          <div class="flex items-center gap-2">
-            <button @click="$emit('openModal')" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 transition-colors">+ 顧客を追加</button>
+          <div class="flex items-baseline gap-2">
+            <h2 class="text-[16px] font-semibold text-[#1b1f24]">顧客管理</h2>
+            <span class="font-mono text-[11px] text-[#9097a1]">{{ filteredCustomers.length }}件</span>
           </div>
+          <button @click="$emit('openModal')" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:bg-[#4338ca] transition-colors">＋ 顧客を追加</button>
         </div>
         <div class="flex items-center gap-2">
-          <input
-            v-model="searchQuery"
-            class="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition"
-            placeholder="🔍 名前・メールで検索..."
-          />
-          <select v-if="allTags.length" v-model="tagFilter" class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition max-w-[130px]">
+          <div class="flex-1 flex items-center gap-[7px] bg-white border border-[#e6e8ec] rounded-[9px] px-3 py-[7px] text-[12.5px]">
+            <span class="text-[#9097a1]">🔍</span>
+            <input
+              v-model="searchQuery"
+              class="flex-1 bg-transparent text-[12.5px] placeholder-[#9097a1] focus:outline-none"
+              placeholder="名前・メールで検索..."
+            />
+          </div>
+          <select v-if="allTags.length" v-model="tagFilter" class="bg-white border border-[#e6e8ec] rounded-[9px] px-2.5 py-[7px] text-[12px] focus:outline-none max-w-[130px]">
             <option value="">タグ絞り込み</option>
             <option v-for="tag in allTags" :key="tag" :value="tag">🏷 {{ tag }}</option>
           </select>
@@ -102,16 +112,16 @@ const addTag = () => {
       </div>
 
       <!-- Segment tabs -->
-      <div class="flex gap-1 px-5 py-2 bg-slate-50/80 border-b border-slate-200/60 shrink-0">
+      <div class="flex gap-1 px-7 py-2 border-b border-[#ebedf0] shrink-0">
         <button
           v-for="seg in segments"
           :key="seg"
           @click="$emit('update:selectedSegment', seg); $emit('fetchCustomers')"
           :class="[
-            'px-3 py-1 text-[10px] font-bold rounded-md transition-all whitespace-nowrap',
+            'px-3 py-1 text-[11px] font-semibold rounded-[7px] transition-all whitespace-nowrap',
             selectedSegment === seg
-              ? 'bg-white text-indigo-600 shadow-sm border border-slate-200'
-              : 'text-slate-500 hover:text-slate-700',
+              ? 'bg-white text-[#4f46e5] shadow-sm border border-[#ebedf0]'
+              : 'text-[#9097a1] hover:text-[#3a3f47]',
           ]"
         >
           {{ seg }}
@@ -119,138 +129,176 @@ const addTag = () => {
       </div>
 
       <!-- Table -->
-      <div class="flex-1 overflow-y-auto">
-        <table class="w-full">
-          <thead class="bg-slate-50 sticky top-0 z-10">
-            <tr class="text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              <th class="p-2.5 pl-5 w-10"></th>
-              <th class="p-2.5">顧客名</th>
-              <th class="p-2.5 hidden lg:table-cell">メール</th>
-              <th class="p-2.5 hidden lg:table-cell">電話</th>
-              <th class="p-2.5 pr-5 text-right">セグメント</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr
-              v-for="c in filteredCustomers"
-              :key="c.id"
-              @click="$emit('update:selectedCustomer', c)"
-              :class="['cursor-pointer transition-colors', selectedCustomer?.id === c.id ? 'bg-indigo-50/60' : 'hover:bg-[#f7f8fa]']"
-            >
-              <td class="p-2.5 pl-5">
-                <div :class="[avatarColor(c.name), 'w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white']">
-                  {{ avatarInitial(c.name) }}
-                </div>
-              </td>
-              <td class="p-2.5">
-                <div class="text-xs font-semibold text-slate-900">{{ c.name }}</div>
-                <div class="text-[10px] text-slate-400 font-mono truncate max-w-[180px]">{{ c.line_uid && c.line_uid !== '未連携' ? c.line_uid : '' }}</div>
-              </td>
-              <td class="p-2.5 hidden lg:table-cell">
-                <span class="text-[10px] text-slate-500">{{ c.email || '—' }}</span>
-              </td>
-              <td class="p-2.5 hidden lg:table-cell">
-                <span class="text-[10px] text-slate-500">{{ c.phone || '—' }}</span>
-              </td>
-              <td class="p-2.5 pr-5 text-right">
-                <span :class="['inline-block px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap', segmentStyle(c.segment)]">{{ c.segment || '未診断' }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="flex-1 overflow-y-auto bg-white">
+        <div class="sticky top-0 z-10 grid gap-3 px-[18px] py-[11px] bg-[#fafbfc] border-b border-[#ebedf0] text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.03em]" style="grid-template-columns: 1.8fr 1fr 1.2fr 1.1fr">
+          <div>名前</div>
+          <div>連携チャネル</div>
+          <div>タグ</div>
+          <div>セグメント</div>
+        </div>
+        <div
+          v-for="c in filteredCustomers"
+          :key="c.id"
+          @click="$emit('update:selectedCustomer', c)"
+          class="grid gap-3 px-[18px] py-[13px] border-b border-[#f4f5f6] items-center cursor-pointer transition-colors"
+          :class="selectedCustomer?.id === c.id ? 'bg-[#eef2ff]' : 'hover:bg-[#f7f8fa]'"
+          style="grid-template-columns: 1.8fr 1fr 1.2fr 1.1fr"
+        >
+          <!-- 名前 -->
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div :class="[avatarColor(c.name), 'w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold text-white shrink-0']">
+              {{ avatarInitial(c.name) }}
+            </div>
+            <div class="min-w-0">
+              <div class="text-[12.5px] font-medium text-[#1b1f24] truncate">{{ c.name }}</div>
+              <div class="text-[11px] text-[#9097a1] font-mono truncate">{{ hasLine(c) ? c.line_uid : '' }}</div>
+            </div>
+          </div>
+          <!-- 連携チャネル -->
+          <div class="flex items-center gap-1.5">
+            <span v-if="hasLine(c)" class="w-5 h-5 rounded-[5px] bg-[#06C755] text-white text-[10px] font-bold flex items-center justify-center" title="LINE">L</span>
+            <span v-if="hasEmail(c)" class="w-5 h-5 rounded-[5px] bg-[#3B6EF5] text-white text-[10px] font-bold flex items-center justify-center" title="メール">@</span>
+            <span v-if="hasPhone(c)" class="w-5 h-5 rounded-[5px] bg-[#8B5CF6] text-white text-[10px] font-bold flex items-center justify-center" title="SMS">S</span>
+            <span v-if="!hasLine(c) && !hasEmail(c) && !hasPhone(c)" class="text-[11px] text-[#b0b6bf]">—</span>
+          </div>
+          <!-- タグ -->
+          <div class="flex items-center gap-1 flex-wrap min-w-0">
+            <span
+              v-for="tag in (c.tags || []).slice(0, 2)"
+              :key="tag"
+              class="bg-[#f1f2f4] text-[#5a606a] text-[10.5px] px-2 py-0.5 rounded-full whitespace-nowrap"
+            >{{ tag }}</span>
+            <span v-if="(c.tags || []).length > 2" class="text-[10.5px] text-[#9097a1]">+{{ c.tags.length - 2 }}</span>
+            <span v-if="!(c.tags?.length)" class="text-[11px] text-[#b0b6bf]">—</span>
+          </div>
+          <!-- セグメント -->
+          <div>
+            <span class="inline-flex items-center gap-[5px] text-[11.5px] font-medium whitespace-nowrap" :class="segmentDot(c.segment).text">
+              <span class="w-[6px] h-[6px] rounded-full" :class="segmentDot(c.segment).dot"></span>
+              {{ c.segment || '未診断' }}
+            </span>
+          </div>
+        </div>
         <div v-if="filteredCustomers.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
-          <div class="text-3xl mb-2">👥</div>
-          <p class="text-xs text-slate-400">顧客が見つかりません</p>
+          <p class="text-[12px] text-[#9097a1]">顧客が見つかりません</p>
         </div>
       </div>
     </main>
 
     <!-- Right: Detail / Timeline -->
-    <aside class="flex-[2] bg-slate-50/50 overflow-y-auto flex flex-col">
+    <aside class="flex-[2] bg-white overflow-y-auto flex flex-col">
       <template v-if="selectedCustomer">
-        <!-- Customer detail -->
-        <div class="px-5 py-4 border-b border-slate-200/60">
-          <div class="flex items-center gap-3 mb-3">
-            <div :class="[avatarColor(selectedCustomer.name), 'w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white']">
-              {{ avatarInitial(selectedCustomer.name) }}
-            </div>
-            <div class="flex-1 min-w-0">
-              <h3 class="text-sm font-bold text-slate-900">{{ selectedCustomer.name }}</h3>
-              <select
-                :value="selectedCustomer.segment || '未診断'"
-                @change="emit('updateSegment', { id: selectedCustomer.id, segment: $event.target.value })"
-                :class="['inline-block px-2 py-0.5 rounded-md text-[9px] font-bold mt-0.5 border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-400', segmentStyle(selectedCustomer.segment)]"
-              >
-                <option v-for="s in allSegments" :key="s" :value="s">{{ s }}</option>
-              </select>
-            </div>
+        <!-- Customer detail header -->
+        <div class="px-6 pt-6 pb-4 border-b border-[#f4f5f6] flex flex-col items-center text-center">
+          <div :class="[avatarColor(selectedCustomer.name), 'w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold text-white mb-2.5']">
+            {{ avatarInitial(selectedCustomer.name) }}
+          </div>
+          <h3 class="text-[14px] font-semibold text-[#1b1f24]">{{ selectedCustomer.name }}</h3>
+          <div class="flex flex-wrap justify-center gap-1 mt-1.5">
+            <span
+              v-for="tag in (selectedCustomer.tags || [])"
+              :key="tag"
+              class="bg-[#f1f2f4] text-[#5a606a] text-[10.5px] px-2 py-0.5 rounded-full"
+            >{{ tag }}</span>
+          </div>
+          <select
+            :value="selectedCustomer.segment || '未診断'"
+            @change="emit('updateSegment', { id: selectedCustomer.id, segment: $event.target.value })"
+            class="mt-2.5 bg-white border border-[#e6e8ec] rounded-[9px] px-2.5 py-1 text-[11.5px] font-medium cursor-pointer focus:outline-none"
+            :class="segmentDot(selectedCustomer.segment).text"
+          >
+            <option v-for="s in allSegments" :key="s" :value="s">{{ s }}</option>
+          </select>
+        </div>
+
+        <!-- 顧客情報 -->
+        <div class="px-6 py-4 border-b border-[#f4f5f6]">
+          <div class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-1.5">顧客情報</div>
+          <div class="flex justify-between py-[7px] border-b border-[#f4f5f6] text-[12px]">
+            <span class="text-[#9097a1]">メール</span>
+            <span class="font-medium text-[#1b1f24] text-right">{{ selectedCustomer.email || '—' }}</span>
+          </div>
+          <div class="flex justify-between py-[7px] border-b border-[#f4f5f6] text-[12px]">
+            <span class="text-[#9097a1]">電話</span>
+            <span class="font-medium text-[#1b1f24] text-right">{{ selectedCustomer.phone || '—' }}</span>
+          </div>
+          <div class="flex justify-between py-[7px] border-b border-[#f4f5f6] text-[12px]">
+            <span class="text-[#9097a1]">LINE UID</span>
+            <span class="font-medium text-[#1b1f24] font-mono text-[11px] truncate max-w-[160px] text-right">{{ selectedCustomer.line_uid || '—' }}</span>
+          </div>
+          <div class="flex justify-between py-[7px] border-b border-[#f4f5f6] text-[12px]">
+            <span class="text-[#9097a1]">登録日</span>
+            <span class="font-medium text-[#1b1f24] text-right">{{ selectedCustomer.created_at ? new Date(selectedCustomer.created_at).toLocaleDateString() : '—' }}</span>
           </div>
         </div>
-        <div class="px-5 py-3 space-y-2 border-b border-slate-200/60">
-          <div class="flex justify-between items-center text-xs">
-            <span class="text-slate-500 font-semibold">メール</span>
-            <span class="text-slate-800">{{ selectedCustomer.email || '—' }}</span>
-          </div>
-          <div class="flex justify-between items-center text-xs">
-            <span class="text-slate-500 font-semibold">電話</span>
-            <span class="text-slate-800">{{ selectedCustomer.phone || '—' }}</span>
-          </div>
-          <div class="flex justify-between items-center text-xs">
-            <span class="text-slate-500 font-semibold">LINE UID</span>
-            <span class="text-slate-800 font-mono text-[10px] truncate max-w-[160px]">{{ selectedCustomer.line_uid || '—' }}</span>
-          </div>
-          <div class="flex justify-between items-center text-xs">
-            <span class="text-slate-500 font-semibold">登録日</span>
-            <span class="text-slate-800">{{ selectedCustomer.created_at ? new Date(selectedCustomer.created_at).toLocaleDateString() : '—' }}</span>
+
+        <!-- 連携チャネル -->
+        <div class="px-6 py-4 border-b border-[#f4f5f6]">
+          <div class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-2">連携チャネル</div>
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-[9px] px-2.5 py-2 bg-[#f7f8fa] rounded-[9px]">
+              <span class="w-5 h-5 rounded-[5px] bg-[#06C755] text-white text-[10px] font-bold flex items-center justify-center">L</span>
+              <span class="flex-1 text-[12px] font-medium text-[#3a3f47]">LINE</span>
+              <span class="text-[11px] font-medium" :class="hasLine(selectedCustomer) ? 'text-[#06914a]' : 'text-[#b0b6bf]'">{{ hasLine(selectedCustomer) ? '接続済み' : '未連携' }}</span>
+            </div>
+            <div class="flex items-center gap-[9px] px-2.5 py-2 bg-[#f7f8fa] rounded-[9px]">
+              <span class="w-5 h-5 rounded-[5px] bg-[#3B6EF5] text-white text-[10px] font-bold flex items-center justify-center">@</span>
+              <span class="flex-1 text-[12px] font-medium text-[#3a3f47]">メール</span>
+              <span class="text-[11px] font-medium" :class="hasEmail(selectedCustomer) ? 'text-[#06914a]' : 'text-[#b0b6bf]'">{{ hasEmail(selectedCustomer) ? '接続済み' : '未連携' }}</span>
+            </div>
+            <div class="flex items-center gap-[9px] px-2.5 py-2 bg-[#f7f8fa] rounded-[9px]">
+              <span class="w-5 h-5 rounded-[5px] bg-[#8B5CF6] text-white text-[10px] font-bold flex items-center justify-center">S</span>
+              <span class="flex-1 text-[12px] font-medium text-[#3a3f47]">SMS</span>
+              <span class="text-[11px] font-medium" :class="hasPhone(selectedCustomer) ? 'text-[#06914a]' : 'text-[#b0b6bf]'">{{ hasPhone(selectedCustomer) ? '接続済み' : '未連携' }}</span>
+            </div>
           </div>
         </div>
 
         <!-- Tags -->
-        <div class="px-5 py-3 border-b border-slate-200/60">
-          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">タグ</div>
+        <div class="px-6 py-4 border-b border-[#f4f5f6]">
+          <div class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-2">タグ</div>
           <div class="flex flex-wrap gap-1.5 mb-2">
             <span
               v-for="tag in (selectedCustomer.tags || [])"
               :key="tag"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100"
+              class="inline-flex items-center gap-1 bg-[#f1f2f4] text-[#5a606a] text-[10.5px] px-2 py-0.5 rounded-full"
             >
               {{ tag }}
-              <button @click="emit('removeTag', { id: selectedCustomer.id, tag })" class="text-indigo-300 hover:text-red-500 transition-colors leading-none">✕</button>
+              <button @click="emit('removeTag', { id: selectedCustomer.id, tag })" class="text-[#9097a1] hover:text-red-500 transition-colors leading-none">✕</button>
             </span>
-            <span v-if="!(selectedCustomer.tags?.length)" class="text-[10px] text-slate-400">タグなし</span>
+            <span v-if="!(selectedCustomer.tags?.length)" class="text-[11px] text-[#b0b6bf]">タグなし</span>
           </div>
           <div class="flex gap-1.5">
             <input
               v-model="newTag"
               @keydown.enter.prevent="addTag"
-              class="flex-1 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition"
+              class="flex-1 bg-white border border-[#e6e8ec] rounded-[9px] px-3 py-[7px] text-[12px] placeholder-[#9097a1] focus:outline-none focus:border-[#4f46e5]"
               placeholder="タグを追加..."
             />
-            <button @click="addTag" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-700 transition-colors">追加</button>
+            <button @click="addTag" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[11.5px] text-white font-medium hover:bg-[#4338ca] transition-colors">追加</button>
           </div>
         </div>
       </template>
 
       <!-- Timeline -->
-      <div class="px-5 py-3 flex-1">
-        <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">配信タイムライン</h4>
+      <div class="px-6 py-4 flex-1">
+        <div class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-3">配信タイムライン</div>
         <div v-if="stepQueues.length === 0" class="flex flex-col items-center justify-center py-8 text-center">
-          <div class="text-2xl mb-2">📭</div>
-          <p class="text-[11px] text-slate-400">配信キューはまだありません</p>
+          <p class="text-[12px] text-[#9097a1]">配信キューはまだありません</p>
         </div>
         <div v-else class="space-y-2">
-          <div v-for="queue in stepQueues" :key="queue.id" class="bg-white p-3 rounded-[12px] border border-[#ebedf0] flex flex-col gap-1">
+          <div v-for="queue in stepQueues" :key="queue.id" class="bg-white border border-[#ebedf0] rounded-[9px] px-3 py-2.5 flex flex-col gap-1">
             <div class="flex justify-between items-center">
-              <span class="text-xs font-semibold text-slate-800">{{ queue.customers?.name }}</span>
-              <span :class="['px-2 py-0.5 rounded-md text-[9px] font-bold', statusClass(queue.status)]">{{ queue.status }}</span>
+              <span class="text-[12.5px] font-medium text-[#1b1f24]">{{ queue.customers?.name }}</span>
+              <span :class="['px-2 py-0.5 rounded-full text-[10.5px] font-medium', statusClass(queue.status)]">{{ queue.status }}</span>
             </div>
-            <div class="flex items-center justify-between text-[10px] text-slate-400">
+            <div class="flex items-center justify-between text-[11px] text-[#9097a1]">
               <div class="flex items-center gap-1.5">
-                <span class="font-semibold text-indigo-500">Step {{ queue.step_number }}</span>
+                <span class="font-semibold text-[#4f46e5]">Step {{ queue.step_number }}</span>
                 <span>·</span>
                 <span>{{ queue.delivery_channel }}</span>
               </div>
-              <div class="font-mono">{{ formatTime(queue.scheduled_at) }}</div>
+              <div class="font-mono tabular-nums">{{ formatTime(queue.scheduled_at) }}</div>
             </div>
           </div>
         </div>

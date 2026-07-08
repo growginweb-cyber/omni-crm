@@ -273,7 +273,7 @@ const sendLineTest = async () => {
 <template>
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Channel tabs -->
-    <div class="px-5 py-3 bg-white border-b border-slate-200/60 flex items-center gap-4 shrink-0">
+    <div class="px-5 py-3 bg-white border-b border-[#ebedf0] flex items-center gap-4 shrink-0">
       <h2 class="text-lg font-bold text-slate-900 mr-2">コンテンツ作成</h2>
       <div class="flex bg-slate-100 p-0.5 rounded-lg">
         <button
@@ -295,16 +295,16 @@ const sendLineTest = async () => {
     <div class="flex-1 flex overflow-hidden">
       <!-- ==================== LINE Editor ==================== -->
       <template v-if="selectedChannel === 'LINE'">
-        <div class="flex-1 min-w-0 flex flex-col border-r border-slate-200/60 bg-white overflow-hidden">
+        <div class="flex-1 min-w-0 flex flex-col border-r border-[#ebedf0] bg-white overflow-hidden">
           <!-- Header -->
-          <div class="px-5 py-3 border-b border-slate-200/60 shrink-0">
-            <h3 class="text-xs font-bold text-slate-700 mb-2">LINE メッセージビルダー</h3>
-            <input :value="templateTitle" @input="$emit('update:templateTitle', $event.target.value)" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition" placeholder="テンプレート名（例: 初回クーポン配信）" />
+          <div class="px-5 py-3 border-b border-[#ebedf0] shrink-0">
+            <h3 class="text-[12px] font-semibold text-[#6b7280] mb-2">LINE メッセージビルダー</h3>
+            <input :value="templateTitle" @input="$emit('update:templateTitle', $event.target.value)" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition" placeholder="テンプレート名（例: 初回クーポン配信）" />
           </div>
 
           <!-- Message type selector -->
-          <div class="px-5 py-2 bg-slate-50/80 border-b border-slate-200/60 flex gap-1.5 shrink-0">
-            <button v-for="mt in lineMessageTypes" :key="mt.id" @click="lineMessageType = mt.id" :class="['px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1.5', lineMessageType === mt.id ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 bg-white border border-slate-200 hover:border-emerald-300 hover:text-emerald-600']">
+          <div class="px-5 py-2 bg-[#f7f8fa] border-b border-[#ebedf0] flex gap-1.5 shrink-0">
+            <button v-for="mt in lineMessageTypes" :key="mt.id" @click="lineMessageType = mt.id" :class="['px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1.5', lineMessageType === mt.id ? 'bg-[#4f46e5] text-white shadow-sm' : 'text-[#3a3f47] bg-white border border-[#e6e8ec] hover:bg-[#f1f2f4]']">
               <span>{{ mt.icon }}</span> {{ mt.label }}
             </button>
           </div>
@@ -314,7 +314,7 @@ const sendLineTest = async () => {
             <!-- ===== Text blocks ===== -->
             <template v-if="lineMessageType === 'text'">
               <div class="flex gap-2 mb-4">
-                <button v-for="bt in blockTypes" :key="bt.type" @click="addBlock(bt.type)" class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors">
+                <button v-for="bt in blockTypes" :key="bt.type" @click="addBlock(bt.type)" class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-[#3a3f47] bg-white border border-[#e6e8ec] rounded-[8px] hover:bg-[#f1f2f4] transition-colors">
                   <span>{{ bt.icon }}</span> {{ bt.label }}
                 </button>
               </div>
@@ -323,23 +323,23 @@ const sendLineTest = async () => {
                 <p class="text-xs text-slate-400">ブロックを追加してメッセージを作成</p>
               </div>
               <div class="space-y-3">
-                <div v-for="(block, i) in lineBlocks" :key="block.id" class="bg-white border border-[#ebedf0] rounded-[14px] p-4 group relative" :class="dragIndex === i ? 'ring-2 ring-emerald-400' : ''">
+                <div v-for="(block, i) in lineBlocks" :key="block.id" class="bg-white border border-[#ebedf0] rounded-[13px] p-4 group relative" :class="dragIndex === i ? 'ring-2 ring-emerald-400' : ''">
                   <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{{ block.type === 'text' ? '📝 テキスト' : block.type === 'image' ? '🖼️ 画像' : '🔘 ボタン' }}</span>
+                    <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">{{ block.type === 'text' ? '📝 テキスト' : block.type === 'image' ? '🖼️ 画像' : '🔘 ボタン' }}</span>
                     <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button @click="moveBlock(i, i - 1)" :disabled="i === 0" class="w-5 h-5 rounded text-[10px] bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center">↑</button>
                       <button @click="moveBlock(i, i + 1)" :disabled="i === lineBlocks.length - 1" class="w-5 h-5 rounded text-[10px] bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center">↓</button>
                       <button @click="removeBlock(i)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center">×</button>
                     </div>
                   </div>
-                  <textarea v-if="block.type === 'text'" v-model="block.text" @input="syncContent" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition resize-none" placeholder="メッセージテキストを入力..."></textarea>
+                  <textarea v-if="block.type === 'text'" v-model="block.text" @input="syncContent" rows="3" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition resize-none" placeholder="メッセージテキストを入力..."></textarea>
                   <div v-if="block.type === 'image'">
-                    <input v-model="block.url" @input="syncContent" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（https://...）" />
-                    <div v-if="block.url" class="mt-2 rounded-lg overflow-hidden border border-slate-200 bg-slate-50"><img :src="block.url" class="w-full max-h-40 object-cover" @error="$event.target.style.display='none'" /></div>
+                    <input v-model="block.url" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（https://...）" />
+                    <div v-if="block.url" class="mt-2 rounded-lg overflow-hidden border border-[#ebedf0] bg-[#f7f8fa]"><img :src="block.url" class="w-full max-h-40 object-cover" @error="$event.target.style.display='none'" /></div>
                   </div>
                   <div v-if="block.type === 'button'" class="space-y-2">
-                    <input v-model="block.label" @input="syncContent" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ボタンラベル（例: 詳しく見る）" />
-                    <input v-model="block.url" @input="syncContent" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="リンクURL（https://...）" />
+                    <input v-model="block.label" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ボタンラベル（例: 詳しく見る）" />
+                    <input v-model="block.url" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="リンクURL（https://...）" />
                   </div>
                 </div>
               </div>
@@ -349,31 +349,31 @@ const sendLineTest = async () => {
             <template v-else-if="lineMessageType === 'flex'">
               <div class="space-y-4">
                 <div>
-                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">ヒーロー画像</label>
-                  <input v-model="flexData.heroImage" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（https://...）" />
-                  <div v-if="flexData.heroImage" class="mt-2 rounded-lg overflow-hidden border border-slate-200 bg-slate-50"><img :src="flexData.heroImage" class="w-full max-h-32 object-cover" @error="$event.target.style.display='none'" /></div>
+                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">ヒーロー画像</label>
+                  <input v-model="flexData.heroImage" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（https://...）" />
+                  <div v-if="flexData.heroImage" class="mt-2 rounded-lg overflow-hidden border border-[#ebedf0] bg-[#f7f8fa]"><img :src="flexData.heroImage" class="w-full max-h-32 object-cover" @error="$event.target.style.display='none'" /></div>
                 </div>
                 <div>
-                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">タイトル</label>
-                  <input v-model="flexData.title" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトルテキスト" />
+                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">タイトル</label>
+                  <input v-model="flexData.title" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトルテキスト" />
                 </div>
                 <div>
-                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">サブタイトル</label>
-                  <input v-model="flexData.subtitle" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="サブタイトル（任意）" />
+                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">サブタイトル</label>
+                  <input v-model="flexData.subtitle" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="サブタイトル（任意）" />
                 </div>
                 <div>
-                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">本文</label>
+                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">本文</label>
                   <div v-for="(_, ti) in flexData.bodyTexts" :key="ti" class="flex gap-2 mb-2">
-                    <textarea v-model="flexData.bodyTexts[ti]" rows="2" class="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="本文テキスト"></textarea>
+                    <textarea v-model="flexData.bodyTexts[ti]" rows="2" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="本文テキスト"></textarea>
                     <button v-if="flexData.bodyTexts.length > 1" @click="flexData.bodyTexts.splice(ti, 1)" class="text-red-400 hover:text-red-600 text-xs self-start mt-1">×</button>
                   </div>
                   <button @click="flexData.bodyTexts.push('')" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ テキスト追加</button>
                 </div>
                 <div>
-                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">フッターボタン</label>
+                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">フッターボタン</label>
                   <div v-for="(btn, bi) in flexData.footerButtons" :key="bi" class="flex gap-2 mb-2">
-                    <input v-model="btn.label" class="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ラベル" />
-                    <input v-model="btn.url" class="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="URL" />
+                    <input v-model="btn.label" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ラベル" />
+                    <input v-model="btn.url" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="URL" />
                     <button v-if="flexData.footerButtons.length > 1" @click="flexData.footerButtons.splice(bi, 1)" class="text-red-400 hover:text-red-600 text-xs">×</button>
                   </div>
                   <button @click="flexData.footerButtons.push({ label: '', url: '' })" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ ボタン追加</button>
@@ -384,28 +384,28 @@ const sendLineTest = async () => {
             <!-- ===== Carousel ===== -->
             <template v-else-if="lineMessageType === 'carousel'">
               <div class="space-y-4">
-                <div v-for="(card, ci) in carouselCards" :key="ci" class="border border-[#ebedf0] rounded-[14px] p-4 group relative">
+                <div v-for="(card, ci) in carouselCards" :key="ci" class="border border-[#ebedf0] rounded-[13px] p-4 group relative">
                   <div class="flex items-center justify-between mb-3">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">カード {{ ci + 1 }} / {{ carouselCards.length }}</span>
+                    <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">カード {{ ci + 1 }} / {{ carouselCards.length }}</span>
                     <button v-if="carouselCards.length > 1" @click="removeCarouselCard(ci)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                   </div>
                   <div class="space-y-2">
-                    <input v-model="card.imageUrl" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL" />
-                    <div v-if="card.imageUrl" class="rounded-lg overflow-hidden border border-slate-200 bg-slate-50 max-h-24"><img :src="card.imageUrl" class="w-full object-cover" @error="$event.target.style.display='none'" /></div>
-                    <input v-model="card.title" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトル（最大40文字）" maxlength="40" />
-                    <textarea v-model="card.text" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="説明テキスト（最大60文字）" maxlength="60"></textarea>
+                    <input v-model="card.imageUrl" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL" />
+                    <div v-if="card.imageUrl" class="rounded-lg overflow-hidden border border-[#ebedf0] bg-[#f7f8fa] max-h-24"><img :src="card.imageUrl" class="w-full object-cover" @error="$event.target.style.display='none'" /></div>
+                    <input v-model="card.title" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトル（最大40文字）" maxlength="40" />
+                    <textarea v-model="card.text" rows="2" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="説明テキスト（最大60文字）" maxlength="60"></textarea>
                     <div class="pt-1">
                       <label class="text-[10px] font-bold text-slate-400 block mb-1">アクションボタン</label>
                       <div v-for="(btn, bi) in card.buttons" :key="bi" class="flex gap-2 mb-1.5">
-                        <input v-model="btn.label" class="flex-1 border border-slate-200 rounded px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="ラベル" />
-                        <input v-model="btn.url" class="flex-1 border border-slate-200 rounded px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="URL" />
+                        <input v-model="btn.label" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="ラベル" />
+                        <input v-model="btn.url" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="URL" />
                         <button v-if="card.buttons.length > 1" @click="card.buttons.splice(bi, 1)" class="text-red-400 text-xs">×</button>
                       </div>
                       <button v-if="card.buttons.length < 3" @click="card.buttons.push({ label: '', url: '' })" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ ボタン</button>
                     </div>
                   </div>
                 </div>
-                <button @click="addCarouselCard" :disabled="carouselCards.length >= 10" class="w-full py-2.5 border-2 border-dashed border-slate-200 rounded-[14px] text-[11px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors disabled:opacity-40">+ カード追加（最大10枚）</button>
+                <button @click="addCarouselCard" :disabled="carouselCards.length >= 10" class="w-full py-2.5 border-2 border-dashed border-[#ebedf0] rounded-[13px] text-[11px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors disabled:opacity-40">+ カード追加（最大10枚）</button>
               </div>
             </template>
 
@@ -413,9 +413,9 @@ const sendLineTest = async () => {
             <template v-else-if="lineMessageType === 'imagemap'">
               <div class="space-y-4">
                 <div>
-                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">ベース画像</label>
-                  <input v-model="imageMapData.baseUrl" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（幅1040px推奨）" />
-                  <div v-if="imageMapData.baseUrl" class="mt-2 relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">ベース画像</label>
+                  <input v-model="imageMapData.baseUrl" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（幅1040px推奨）" />
+                  <div v-if="imageMapData.baseUrl" class="mt-2 relative rounded-lg overflow-hidden border border-[#ebedf0] bg-[#f7f8fa]">
                     <img :src="imageMapData.baseUrl" class="w-full" @error="$event.target.style.display='none'" />
                     <div v-for="(action, ai) in imageMapData.actions" :key="ai" class="absolute border-2 border-emerald-400/70 bg-emerald-400/15 flex items-center justify-center cursor-pointer" :style="{ left: (action.x / imageMapData.baseWidth * 100) + '%', top: (action.y / imageMapData.baseHeight * 100) + '%', width: (action.width / imageMapData.baseWidth * 100) + '%', height: (action.height / imageMapData.baseHeight * 100) + '%' }">
                       <span class="text-[8px] bg-emerald-600 text-white px-1.5 py-0.5 rounded font-bold shadow">{{ ai + 1 }}</span>
@@ -423,54 +423,54 @@ const sendLineTest = async () => {
                   </div>
                 </div>
                 <div class="flex gap-3">
-                  <label class="flex items-center gap-1.5 text-[10px] text-slate-500">幅 <input type="number" v-model.number="imageMapData.baseWidth" class="w-16 border border-slate-200 rounded px-2 py-1 text-[10px] text-center" /></label>
-                  <label class="flex items-center gap-1.5 text-[10px] text-slate-500">高さ <input type="number" v-model.number="imageMapData.baseHeight" class="w-16 border border-slate-200 rounded px-2 py-1 text-[10px] text-center" /></label>
+                  <label class="flex items-center gap-1.5 text-[10px] text-slate-500">幅 <input type="number" v-model.number="imageMapData.baseWidth" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
+                  <label class="flex items-center gap-1.5 text-[10px] text-slate-500">高さ <input type="number" v-model.number="imageMapData.baseHeight" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
                 </div>
                 <div>
-                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">タップエリア</label>
-                  <div v-for="(action, ai) in imageMapData.actions" :key="ai" class="border border-[#ebedf0] rounded-[14px] p-3 mb-3 space-y-2">
+                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-2">タップエリア</label>
+                  <div v-for="(action, ai) in imageMapData.actions" :key="ai" class="border border-[#ebedf0] rounded-[13px] p-3 mb-3 space-y-2">
                     <div class="flex items-center justify-between">
                       <span class="text-[10px] font-bold text-slate-500 flex items-center gap-1"><span class="w-4 h-4 bg-emerald-600 text-white rounded text-[8px] flex items-center justify-center font-bold">{{ ai + 1 }}</span> エリア</span>
                       <button v-if="imageMapData.actions.length > 1" @click="removeImageMapAction(ai)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center">×</button>
                     </div>
                     <div class="grid grid-cols-4 gap-2">
-                      <label class="text-[10px] text-slate-500">X <input type="number" v-model.number="action.x" class="w-full border border-slate-200 rounded px-2 py-1 text-[10px] mt-0.5" /></label>
-                      <label class="text-[10px] text-slate-500">Y <input type="number" v-model.number="action.y" class="w-full border border-slate-200 rounded px-2 py-1 text-[10px] mt-0.5" /></label>
-                      <label class="text-[10px] text-slate-500">幅 <input type="number" v-model.number="action.width" class="w-full border border-slate-200 rounded px-2 py-1 text-[10px] mt-0.5" /></label>
-                      <label class="text-[10px] text-slate-500">高さ <input type="number" v-model.number="action.height" class="w-full border border-slate-200 rounded px-2 py-1 text-[10px] mt-0.5" /></label>
+                      <label class="text-[10px] text-slate-500">X <input type="number" v-model.number="action.x" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] mt-0.5" /></label>
+                      <label class="text-[10px] text-slate-500">Y <input type="number" v-model.number="action.y" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] mt-0.5" /></label>
+                      <label class="text-[10px] text-slate-500">幅 <input type="number" v-model.number="action.width" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] mt-0.5" /></label>
+                      <label class="text-[10px] text-slate-500">高さ <input type="number" v-model.number="action.height" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] mt-0.5" /></label>
                     </div>
                     <div class="flex gap-2">
-                      <select v-model="action.type" class="text-[10px] border border-slate-200 rounded px-2 py-1 bg-white"><option value="uri">URL遷移</option><option value="message">メッセージ送信</option></select>
-                      <input v-model="action.value" class="flex-1 border border-slate-200 rounded px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" :placeholder="action.type === 'uri' ? 'https://...' : '送信テキスト'" />
+                      <select v-model="action.type" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 bg-white"><option value="uri">URL遷移</option><option value="message">メッセージ送信</option></select>
+                      <input v-model="action.value" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" :placeholder="action.type === 'uri' ? 'https://...' : '送信テキスト'" />
                     </div>
-                    <input v-model="action.label" class="w-full border border-slate-200 rounded px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="ラベル（例: 詳しく見る）" />
+                    <input v-model="action.label" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="ラベル（例: 詳しく見る）" />
                   </div>
-                  <button @click="addImageMapAction" class="w-full py-2 border-2 border-dashed border-slate-200 rounded-[14px] text-[10px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">+ タップエリア追加</button>
+                  <button @click="addImageMapAction" class="w-full py-2 border-2 border-dashed border-[#ebedf0] rounded-[13px] text-[10px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">+ タップエリア追加</button>
                 </div>
               </div>
             </template>
           </div>
 
           <!-- Save bar -->
-          <div class="px-5 py-3 border-t border-slate-200/60 bg-white shrink-0 space-y-2">
+          <div class="px-5 py-3 border-t border-[#ebedf0] bg-white shrink-0 space-y-2">
             <div class="flex items-center gap-2">
-              <input v-model="testLineUid" class="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition font-mono" placeholder="LINE UID でテスト送信..." />
+              <input v-model="testLineUid" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition font-mono" placeholder="LINE UID でテスト送信..." />
               <button @click="sendLineTest" :disabled="!testLineUid || isSendingTest" class="rounded-lg bg-emerald-100 text-emerald-700 px-3 py-1.5 text-[10px] font-bold hover:bg-emerald-200 transition-colors disabled:opacity-40 whitespace-nowrap">{{ isSendingTest ? '送信中...' : 'テスト送信' }}</button>
             </div>
             <div v-if="testSendResult" class="text-[10px] font-bold" :class="testSendResult.startsWith('✅') ? 'text-emerald-600' : 'text-red-500'">{{ testSendResult }}</div>
             <div class="flex items-center justify-between">
-              <select :value="aiTargetSegment" @change="$emit('update:aiTargetSegment', $event.target.value)" class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white">
+              <select :value="aiTargetSegment" @change="$emit('update:aiTargetSegment', $event.target.value)" class="border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs bg-white">
                 <option value="集客最大化タイプ">集客最大化タイプ</option>
                 <option value="コスト削減タイプ">コスト削減タイプ</option>
               </select>
-              <button @click="$emit('save')" class="rounded-lg bg-emerald-600 px-4 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700 transition-colors">テンプレートとして保存</button>
+              <button @click="$emit('save')" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:brightness-110 transition">テンプレートとして保存</button>
             </div>
           </div>
         </div>
 
         <!-- LINE Preview -->
-        <div class="w-80 shrink-0 bg-slate-50/80 flex flex-col items-center p-6 overflow-y-auto">
-          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">LINE プレビュー</span>
+        <div class="w-80 shrink-0 bg-[#f7f8fa] flex flex-col items-center p-6 overflow-y-auto">
+          <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-4">LINE プレビュー</span>
           <div class="w-[280px] bg-[#7494C0] rounded-[2rem] p-3 shadow-xl">
             <div class="bg-white rounded-2xl overflow-hidden min-h-[400px]">
               <div class="bg-emerald-500 px-4 py-3 flex items-center gap-2">
@@ -492,7 +492,7 @@ const sendLineTest = async () => {
                 <!-- Flex preview -->
                 <template v-else-if="lineMessageType === 'flex'">
                   <div class="flex justify-start">
-                    <div class="bg-white rounded-xl overflow-hidden shadow-sm w-[240px]">
+                    <div class="bg-white rounded-[13px] overflow-hidden shadow-sm w-[240px]">
                       <img v-if="flexData.heroImage" :src="flexData.heroImage" class="w-full h-28 object-cover" @error="$event.target.style.display='none'" />
                       <div v-else class="h-20 bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center text-slate-300 text-xs">Hero Image</div>
                       <div class="p-3">
@@ -512,7 +512,7 @@ const sendLineTest = async () => {
                 <!-- Carousel preview -->
                 <template v-else-if="lineMessageType === 'carousel'">
                   <div class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 snap-x" style="scrollbar-width:thin">
-                    <div v-for="(card, ci) in carouselCards" :key="ci" class="bg-white rounded-xl overflow-hidden shadow-sm min-w-[180px] max-w-[180px] shrink-0 snap-start">
+                    <div v-for="(card, ci) in carouselCards" :key="ci" class="bg-white rounded-[13px] overflow-hidden shadow-sm min-w-[180px] max-w-[180px] shrink-0 snap-start">
                       <div v-if="card.imageUrl" class="h-24 bg-slate-100"><img :src="card.imageUrl" class="w-full h-full object-cover" @error="$event.target.style.display='none'" /></div>
                       <div v-else class="h-24 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-[10px] text-slate-300">画像</div>
                       <div class="p-2.5">
@@ -529,7 +529,7 @@ const sendLineTest = async () => {
                 <!-- ImageMap preview -->
                 <template v-else-if="lineMessageType === 'imagemap'">
                   <div class="flex justify-start">
-                    <div class="relative w-[240px] rounded-xl overflow-hidden shadow-sm">
+                    <div class="relative w-[240px] rounded-[13px] overflow-hidden shadow-sm">
                       <img v-if="imageMapData.baseUrl" :src="imageMapData.baseUrl" class="w-full" @error="$event.target.style.display='none'" />
                       <div v-else class="h-40 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-[10px] text-slate-400">画像を設定してください</div>
                       <template v-if="imageMapData.baseUrl">
@@ -549,31 +549,31 @@ const sendLineTest = async () => {
 
       <!-- ==================== Email Editor ==================== -->
       <template v-else-if="selectedChannel === 'Email'">
-        <div class="flex-1 min-w-0 flex flex-col border-r border-slate-200/60 bg-white overflow-hidden">
+        <div class="flex-1 min-w-0 flex flex-col border-r border-[#ebedf0] bg-white overflow-hidden">
           <!-- Header -->
-          <div class="px-5 py-3 border-b border-slate-200/60 shrink-0 space-y-2">
+          <div class="px-5 py-3 border-b border-[#ebedf0] shrink-0 space-y-2">
             <div class="flex items-center justify-between">
-              <h3 class="text-xs font-bold text-slate-700">メールエディタ</h3>
+              <h3 class="text-[12px] font-semibold text-[#6b7280]">メールエディタ</h3>
               <button @click="showEmailSettings = !showEmailSettings" class="text-[10px] text-slate-400 hover:text-slate-600 flex items-center gap-1">⚙️ 設定 <span class="text-[8px]">{{ showEmailSettings ? '▲' : '▼' }}</span></button>
             </div>
-            <input :value="templateTitle" @input="$emit('update:templateTitle', $event.target.value)" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition" placeholder="テンプレート名" />
-            <input v-model="emailSubject" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition" placeholder="件名（例: 期間限定キャンペーンのお知らせ）" />
-            <input v-model="emailSenderName" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition" placeholder="差出人名（例: OMNI CRM サポート）" />
+            <input :value="templateTitle" @input="$emit('update:templateTitle', $event.target.value)" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition" placeholder="テンプレート名" />
+            <input v-model="emailSubject" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition" placeholder="件名（例: 期間限定キャンペーンのお知らせ）" />
+            <input v-model="emailSenderName" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition" placeholder="差出人名（例: OMNI CRM サポート）" />
             <!-- Email settings -->
             <div v-if="showEmailSettings" class="space-y-2 pt-2 border-t border-slate-100">
               <div class="flex items-center gap-3 flex-wrap">
-                <label class="flex items-center gap-1.5 text-[10px] text-slate-500">背景色 <input type="color" v-model="emailSettings.bgColor" class="w-6 h-6 rounded border border-slate-200 cursor-pointer" /></label>
+                <label class="flex items-center gap-1.5 text-[10px] text-slate-500">背景色 <input type="color" v-model="emailSettings.bgColor" class="w-6 h-6 rounded border border-[#ebedf0] cursor-pointer" /></label>
                 <label class="flex items-center gap-1.5 text-[10px] text-slate-500">幅
-                  <select v-model="emailSettings.contentWidth" class="text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white"><option :value="480">480px</option><option :value="600">600px</option><option :value="720">720px</option></select>
+                  <select v-model="emailSettings.contentWidth" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1 py-0.5 bg-white"><option :value="480">480px</option><option :value="600">600px</option><option :value="720">720px</option></select>
                 </label>
               </div>
-              <input v-model="emailSettings.headerLogoUrl" class="w-full border border-slate-200 rounded px-2 py-1 text-[10px] placeholder-slate-400" placeholder="ヘッダーロゴURL（任意）" />
+              <input v-model="emailSettings.headerLogoUrl" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] placeholder-slate-400" placeholder="ヘッダーロゴURL（任意）" />
             </div>
           </div>
 
           <!-- Block buttons -->
-          <div class="px-5 py-2 bg-slate-50/80 border-b border-slate-200/60 flex gap-1.5 shrink-0 flex-wrap">
-            <button v-for="bt in emailBlockTypes" :key="bt.type" @click="addEmailBlock(bt.type)" class="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-slate-500 bg-white border border-slate-200 rounded-lg hover:border-blue-300 hover:text-blue-600 transition-colors">
+          <div class="px-5 py-2 bg-[#f7f8fa] border-b border-[#ebedf0] flex gap-1.5 shrink-0 flex-wrap">
+            <button v-for="bt in emailBlockTypes" :key="bt.type" @click="addEmailBlock(bt.type)" class="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-[#3a3f47] bg-white border border-[#e6e8ec] rounded-[8px] hover:bg-[#f1f2f4] transition-colors">
               <span class="font-mono">{{ bt.icon }}</span> {{ bt.label }}
             </button>
           </div>
@@ -586,10 +586,10 @@ const sendLineTest = async () => {
               <p class="text-[10px] text-slate-300 mt-1">見出し・本文・画像・ボタン・カラムなどを自由に組み合わせ</p>
             </div>
 
-            <div v-for="(block, i) in emailBlocks" :key="block.id" class="bg-white border border-[#ebedf0] rounded-[14px] p-4 group relative">
+            <div v-for="(block, i) in emailBlocks" :key="block.id" class="bg-white border border-[#ebedf0] rounded-[13px] p-4 group relative">
               <!-- Block header -->
               <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">
                   {{ { heading:'H 見出し', paragraph:'¶ 本文', image:'🖼 画像', button:'▣ ボタン', columns:'▥ カラム', divider:'— 区切り', spacer:'↕ 余白', social:'🔗 SNS', footer:'▤ フッター' }[block.type] }}
                 </span>
                 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -602,62 +602,62 @@ const sendLineTest = async () => {
               <!-- Heading -->
               <div v-if="block.type === 'heading'" class="space-y-2">
                 <div class="flex gap-2">
-                  <select v-model="block.level" class="text-[10px] border border-slate-200 rounded px-1.5 py-1 bg-white"><option value="h1">H1</option><option value="h2">H2</option><option value="h3">H3</option></select>
-                  <select v-model="block.align" class="text-[10px] border border-slate-200 rounded px-1.5 py-1 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
-                  <input type="color" v-model="block.color" class="w-7 h-7 rounded border border-slate-200 cursor-pointer" />
+                  <select v-model="block.level" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 bg-white"><option value="h1">H1</option><option value="h2">H2</option><option value="h3">H3</option></select>
+                  <select v-model="block.align" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
+                  <input type="color" v-model="block.color" class="w-7 h-7 rounded border border-[#ebedf0] cursor-pointer" />
                 </div>
-                <input v-model="block.text" :class="[block.level === 'h1' ? 'text-lg' : block.level === 'h2' ? 'text-sm' : 'text-xs', 'w-full border border-slate-200 rounded-lg px-3 py-2 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition']" placeholder="見出しテキスト" />
+                <input v-model="block.text" :class="[block.level === 'h1' ? 'text-lg' : block.level === 'h2' ? 'text-sm' : 'text-xs', 'w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition']" placeholder="見出しテキスト" />
               </div>
 
               <!-- Paragraph (rich text) -->
               <div v-if="block.type === 'paragraph'" class="space-y-2">
                 <div class="flex items-center gap-0.5 flex-wrap">
-                  <button @click="wrapSelection(block.id, '<b>', '</b>')" class="w-7 h-7 rounded text-xs font-bold bg-slate-50 hover:bg-slate-200 transition">B</button>
-                  <button @click="wrapSelection(block.id, '<i>', '</i>')" class="w-7 h-7 rounded text-xs italic bg-slate-50 hover:bg-slate-200 transition">I</button>
-                  <button @click="wrapSelection(block.id, '<u>', '</u>')" class="w-7 h-7 rounded text-xs underline bg-slate-50 hover:bg-slate-200 transition">U</button>
+                  <button @click="wrapSelection(block.id, '<b>', '</b>')" class="w-7 h-7 rounded text-xs font-bold bg-[#f7f8fa] hover:bg-slate-200 transition">B</button>
+                  <button @click="wrapSelection(block.id, '<i>', '</i>')" class="w-7 h-7 rounded text-xs italic bg-[#f7f8fa] hover:bg-slate-200 transition">I</button>
+                  <button @click="wrapSelection(block.id, '<u>', '</u>')" class="w-7 h-7 rounded text-xs underline bg-[#f7f8fa] hover:bg-slate-200 transition">U</button>
                   <span class="w-px h-4 bg-slate-200 mx-1"></span>
-                  <button @click="wrapSelection(block.id, '<span style=&quot;color:#2563eb&quot;>', '</span>')" class="w-7 h-7 rounded text-xs bg-slate-50 hover:bg-slate-200 transition text-blue-600">A</button>
-                  <button @click="wrapSelection(block.id, '<span style=&quot;color:#dc2626&quot;>', '</span>')" class="w-7 h-7 rounded text-xs bg-slate-50 hover:bg-slate-200 transition text-red-600">A</button>
+                  <button @click="wrapSelection(block.id, '<span style=&quot;color:#2563eb&quot;>', '</span>')" class="w-7 h-7 rounded text-xs bg-[#f7f8fa] hover:bg-slate-200 transition text-blue-600">A</button>
+                  <button @click="wrapSelection(block.id, '<span style=&quot;color:#dc2626&quot;>', '</span>')" class="w-7 h-7 rounded text-xs bg-[#f7f8fa] hover:bg-slate-200 transition text-red-600">A</button>
                   <span class="w-px h-4 bg-slate-200 mx-1"></span>
-                  <button @click="linkInputBlockId = linkInputBlockId === block.id ? null : block.id" :class="['w-7 h-7 rounded text-xs bg-slate-50 hover:bg-slate-200 transition', linkInputBlockId === block.id ? 'ring-2 ring-blue-400' : '']">🔗</button>
+                  <button @click="linkInputBlockId = linkInputBlockId === block.id ? null : block.id" :class="['w-7 h-7 rounded text-xs bg-[#f7f8fa] hover:bg-slate-200 transition', linkInputBlockId === block.id ? 'ring-2 ring-blue-400' : '']">🔗</button>
                   <span class="w-px h-4 bg-slate-200 mx-1"></span>
-                  <select v-model="block.fontSize" class="text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white"><option value="12">12px</option><option value="14">14px</option><option value="16">16px</option><option value="18">18px</option></select>
-                  <select v-model="block.align" class="text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
+                  <select v-model="block.fontSize" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1 py-0.5 bg-white"><option value="12">12px</option><option value="14">14px</option><option value="16">16px</option><option value="18">18px</option></select>
+                  <select v-model="block.align" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1 py-0.5 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
                 </div>
                 <div v-if="linkInputBlockId === block.id" class="flex gap-2">
-                  <input v-model="linkInputUrl" placeholder="https://..." class="flex-1 border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20" @keydown.enter="insertLinkTag(block.id)" />
+                  <input v-model="linkInputUrl" placeholder="https://..." class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20" @keydown.enter="insertLinkTag(block.id)" />
                   <button @click="insertLinkTag(block.id)" class="px-2 py-1 text-[10px] font-bold bg-blue-600 text-white rounded hover:bg-blue-700">挿入</button>
                 </div>
-                <textarea v-model="block.html" :data-block-id="block.id" @mouseup="trackSelection(block.id, $event)" @keyup="trackSelection(block.id, $event)" rows="4" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition resize-none font-mono" :style="{ textAlign: block.align }" placeholder="本文テキスト（HTMLタグ使用可）"></textarea>
+                <textarea v-model="block.html" :data-block-id="block.id" @mouseup="trackSelection(block.id, $event)" @keyup="trackSelection(block.id, $event)" rows="4" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition resize-none font-mono" :style="{ textAlign: block.align }" placeholder="本文テキスト（HTMLタグ使用可）"></textarea>
               </div>
 
               <!-- Image -->
               <div v-if="block.type === 'image'" class="space-y-2">
-                <input v-model="block.url" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition" placeholder="画像URL（https://...）" />
+                <input v-model="block.url" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition" placeholder="画像URL（https://...）" />
                 <div class="flex gap-2 items-center flex-wrap">
-                  <input v-model="block.alt" class="flex-1 min-w-0 border border-slate-200 rounded px-2 py-1 text-[10px]" placeholder="代替テキスト" />
-                  <select v-model="block.align" class="text-[10px] border border-slate-200 rounded px-1.5 py-1 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
+                  <input v-model="block.alt" class="flex-1 min-w-0 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px]" placeholder="代替テキスト" />
+                  <select v-model="block.align" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
                   <div class="flex items-center gap-1">
                     <input type="range" v-model="block.width" min="20" max="100" class="w-16 h-1 accent-blue-600" />
                     <span class="text-[10px] text-slate-400 w-8">{{ block.width }}%</span>
                   </div>
                 </div>
-                <input v-model="block.link" class="w-full border border-slate-200 rounded px-2 py-1 text-[10px]" placeholder="クリック時のリンクURL（任意）" />
-                <div v-if="block.url" class="rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                <input v-model="block.link" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px]" placeholder="クリック時のリンクURL（任意）" />
+                <div v-if="block.url" class="rounded-lg overflow-hidden border border-[#ebedf0] bg-[#f7f8fa]">
                   <img :src="block.url" class="max-h-32 object-contain mx-auto" @error="$event.target.style.display='none'" />
                 </div>
               </div>
 
               <!-- Button -->
               <div v-if="block.type === 'button'" class="space-y-2">
-                <input v-model="block.label" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition" placeholder="ボタンテキスト" />
-                <input v-model="block.url" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition" placeholder="リンクURL" />
+                <input v-model="block.label" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition" placeholder="ボタンテキスト" />
+                <input v-model="block.url" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition" placeholder="リンクURL" />
                 <div class="flex gap-2 items-center flex-wrap">
                   <label class="flex items-center gap-1 text-[10px] text-slate-500">背景 <input type="color" v-model="block.bgColor" class="w-6 h-6 rounded border cursor-pointer" /></label>
                   <label class="flex items-center gap-1 text-[10px] text-slate-500">文字 <input type="color" v-model="block.textColor" class="w-6 h-6 rounded border cursor-pointer" /></label>
-                  <select v-model="block.borderRadius" class="text-[10px] border border-slate-200 rounded px-1.5 py-1 bg-white"><option value="0">角なし</option><option value="4">小</option><option value="8">中</option><option value="24">大</option><option value="9999">丸</option></select>
-                  <select v-model="block.size" class="text-[10px] border border-slate-200 rounded px-1.5 py-1 bg-white"><option value="sm">小</option><option value="md">中</option><option value="lg">大</option></select>
-                  <select v-model="block.align" class="text-[10px] border border-slate-200 rounded px-1.5 py-1 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
+                  <select v-model="block.borderRadius" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 bg-white"><option value="0">角なし</option><option value="4">小</option><option value="8">中</option><option value="24">大</option><option value="9999">丸</option></select>
+                  <select v-model="block.size" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 bg-white"><option value="sm">小</option><option value="md">中</option><option value="lg">大</option></select>
+                  <select v-model="block.align" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
                 </div>
               </div>
 
@@ -665,17 +665,17 @@ const sendLineTest = async () => {
               <div v-if="block.type === 'columns'" class="space-y-2">
                 <div class="flex items-center gap-2">
                   <span class="text-[10px] text-slate-500">カラム数:</span>
-                  <button v-for="n in [2, 3]" :key="n" @click="updateColumnsCount(block, n)" :class="['px-2.5 py-0.5 text-[10px] rounded border transition', block.count === n ? 'bg-blue-50 border-blue-300 text-blue-700 font-bold' : 'border-slate-200 text-slate-500 hover:border-blue-200']">{{ n }}</button>
+                  <button v-for="n in [2, 3]" :key="n" @click="updateColumnsCount(block, n)" :class="['px-2.5 py-0.5 text-[10px] rounded border transition', block.count === n ? 'bg-blue-50 border-blue-300 text-blue-700 font-bold' : 'border-[#ebedf0] text-slate-500 hover:border-blue-200']">{{ n }}</button>
                 </div>
                 <div class="grid gap-2" :class="block.count === 2 ? 'grid-cols-2' : 'grid-cols-3'">
-                  <textarea v-for="(col, ci) in block.cols" :key="ci" v-model="col.html" rows="3" class="border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20" :placeholder="'カラム ' + (ci + 1) + '（HTML可）'"></textarea>
+                  <textarea v-for="(col, ci) in block.cols" :key="ci" v-model="col.html" rows="3" class="border border-[#ebedf0] rounded-[9px] px-2 py-1.5 text-[10px] resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20" :placeholder="'カラム ' + (ci + 1) + '（HTML可）'"></textarea>
                 </div>
               </div>
 
               <!-- Divider -->
               <div v-if="block.type === 'divider'" class="flex items-center gap-3">
                 <label class="flex items-center gap-1 text-[10px] text-slate-500">色 <input type="color" v-model="block.color" class="w-6 h-6 rounded border cursor-pointer" /></label>
-                <label class="flex items-center gap-1 text-[10px] text-slate-500">太さ <select v-model="block.thickness" class="text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white"><option value="1">1px</option><option value="2">2px</option><option value="3">3px</option></select></label>
+                <label class="flex items-center gap-1 text-[10px] text-slate-500">太さ <select v-model="block.thickness" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1 py-0.5 bg-white"><option value="1">1px</option><option value="2">2px</option><option value="3">3px</option></select></label>
                 <div class="flex-1 border-t" :style="{ borderColor: block.color, borderWidth: block.thickness + 'px' }"></div>
               </div>
 
@@ -689,39 +689,39 @@ const sendLineTest = async () => {
               <!-- Social -->
               <div v-if="block.type === 'social'" class="space-y-2">
                 <div v-for="(link, li) in block.links" :key="li" class="flex items-center gap-2">
-                  <select v-model="link.platform" class="text-[10px] border border-slate-200 rounded px-1.5 py-1 bg-white w-24"><option v-for="p in socialPlatforms" :key="p">{{ p }}</option></select>
-                  <input v-model="link.url" class="flex-1 border border-slate-200 rounded px-2 py-1 text-[10px]" placeholder="https://..." />
+                  <select v-model="link.platform" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 bg-white w-24"><option v-for="p in socialPlatforms" :key="p">{{ p }}</option></select>
+                  <input v-model="link.url" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px]" placeholder="https://..." />
                   <button @click="block.links.splice(li, 1)" class="text-red-400 hover:text-red-600 text-xs">×</button>
                 </div>
                 <div class="flex items-center gap-2">
                   <button @click="addSocialLink(block)" class="text-[10px] text-blue-600 hover:text-blue-800 font-bold">+ 追加</button>
-                  <select v-model="block.align" class="text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white ml-auto"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
+                  <select v-model="block.align" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1 py-0.5 bg-white ml-auto"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
                 </div>
               </div>
 
               <!-- Footer -->
               <div v-if="block.type === 'footer'" class="space-y-2">
-                <input v-model="block.text" class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition" placeholder="フッターテキスト" />
+                <input v-model="block.text" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition" placeholder="フッターテキスト" />
                 <div class="flex items-center gap-3 flex-wrap">
                   <label class="flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer"><input type="checkbox" v-model="block.showUnsubscribe" class="rounded border-slate-300 text-blue-600 w-3 h-3" /> 配信停止リンク</label>
-                  <select v-model="block.align" class="text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
-                  <input type="color" v-model="block.color" class="w-6 h-6 rounded border border-slate-200 cursor-pointer" />
+                  <select v-model="block.align" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1 py-0.5 bg-white"><option value="left">左</option><option value="center">中央</option><option value="right">右</option></select>
+                  <input type="color" v-model="block.color" class="w-6 h-6 rounded border border-[#ebedf0] cursor-pointer" />
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Save bar -->
-          <div class="px-5 py-3 border-t border-slate-200/60 bg-white flex items-center justify-end shrink-0">
-            <button @click="$emit('save')" :disabled="emailBlocks.length === 0" class="rounded-lg bg-blue-600 px-4 py-1.5 text-[11px] font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-40">テンプレートとして保存</button>
+          <div class="px-5 py-3 border-t border-[#ebedf0] bg-white flex items-center justify-end shrink-0">
+            <button @click="$emit('save')" :disabled="emailBlocks.length === 0" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:brightness-110 transition disabled:opacity-40">テンプレートとして保存</button>
           </div>
         </div>
 
         <!-- Email Preview -->
-        <div class="w-96 shrink-0 bg-slate-50/80 flex flex-col items-center p-6 overflow-y-auto">
-          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">メール プレビュー</span>
-          <div class="w-[340px] bg-white rounded-[14px] shadow-lg border border-[#ebedf0] overflow-hidden">
-            <div class="bg-slate-100 px-4 py-3 border-b border-slate-200">
+        <div class="w-96 shrink-0 bg-[#f7f8fa] flex flex-col items-center p-6 overflow-y-auto">
+          <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-4">メール プレビュー</span>
+          <div class="w-[340px] bg-white rounded-[13px] shadow-lg border border-[#ebedf0] overflow-hidden">
+            <div class="bg-slate-100 px-4 py-3 border-b border-[#ebedf0]">
               <div class="text-[10px] text-slate-400">From: {{ emailSenderName || '差出人未設定' }}</div>
               <div class="text-xs font-bold text-slate-800 mt-0.5">{{ emailSubject || '件名未設定' }}</div>
             </div>
@@ -737,24 +737,24 @@ const sendLineTest = async () => {
 
       <!-- ==================== SMS Editor ==================== -->
       <template v-else-if="selectedChannel === 'SMS'">
-        <div class="flex-1 min-w-0 flex flex-col border-r border-slate-200/60 bg-white overflow-hidden">
-          <div class="px-5 py-3 border-b border-slate-200/60 shrink-0 space-y-2">
-            <h3 class="text-xs font-bold text-slate-700">SMS エディタ</h3>
+        <div class="flex-1 min-w-0 flex flex-col border-r border-[#ebedf0] bg-white overflow-hidden">
+          <div class="px-5 py-3 border-b border-[#ebedf0] shrink-0 space-y-2">
+            <h3 class="text-[12px] font-semibold text-[#6b7280]">SMS エディタ</h3>
             <input
               :value="templateTitle"
               @input="$emit('update:templateTitle', $event.target.value)"
-              class="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition"
+              class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition"
               placeholder="テンプレート名"
             />
           </div>
 
           <div class="flex-1 overflow-y-auto p-5 space-y-4">
             <div>
-              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">メッセージ本文</label>
+              <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-2">メッセージ本文</label>
               <textarea
                 v-model="smsText"
                 rows="6"
-                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition resize-none"
+                class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition resize-none"
                 placeholder="SMSメッセージを入力...（70文字で1通分）"
                 maxlength="670"
               ></textarea>
@@ -762,15 +762,15 @@ const sendLineTest = async () => {
 
             <!-- Char counter & cost -->
             <div class="grid grid-cols-3 gap-3">
-              <div class="bg-[#f7f8fa] rounded-[14px] p-3 text-center">
+              <div class="bg-[#f7f8fa] rounded-[13px] p-3 text-center">
                 <div class="text-lg font-black text-slate-900 tabular-nums">{{ smsCharCount }}</div>
                 <div class="text-[9px] font-bold text-slate-400">文字数</div>
               </div>
-              <div class="bg-[#f7f8fa] rounded-[14px] p-3 text-center">
+              <div class="bg-[#f7f8fa] rounded-[13px] p-3 text-center">
                 <div class="text-lg font-black text-violet-600 tabular-nums">{{ Math.ceil(smsCharCount / 70) || 0 }}</div>
                 <div class="text-[9px] font-bold text-slate-400">通数</div>
               </div>
-              <div class="bg-[#f7f8fa] rounded-[14px] p-3 text-center">
+              <div class="bg-[#f7f8fa] rounded-[13px] p-3 text-center">
                 <div class="text-lg font-black text-slate-900 tabular-nums">¥{{ smsCost }}</div>
                 <div class="text-[9px] font-bold text-slate-400">1通あたり</div>
               </div>
@@ -792,27 +792,27 @@ const sendLineTest = async () => {
             </div>
 
             <!-- URL shortener -->
-            <div class="bg-[#f7f8fa] rounded-[14px] p-4 border border-[#ebedf0]">
-              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">URL短縮</label>
+            <div class="bg-[#f7f8fa] rounded-[13px] p-4 border border-[#ebedf0]">
+              <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-2">URL短縮</label>
               <div class="flex gap-2">
-                <input class="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition" placeholder="短縮したいURLを入力..." />
+                <input class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition" placeholder="短縮したいURLを入力..." />
                 <button class="px-3 py-1.5 text-[10px] font-bold bg-violet-100 text-violet-600 rounded-lg hover:bg-violet-200 transition-colors whitespace-nowrap">短縮</button>
               </div>
             </div>
           </div>
 
-          <div class="px-5 py-3 border-t border-slate-200/60 bg-white flex items-center justify-end shrink-0">
-            <button @click="$emit('save')" :disabled="!smsText" class="rounded-lg bg-violet-600 px-4 py-1.5 text-[11px] font-bold text-white hover:bg-violet-700 transition-colors disabled:opacity-40">テンプレートとして保存</button>
+          <div class="px-5 py-3 border-t border-[#ebedf0] bg-white flex items-center justify-end shrink-0">
+            <button @click="$emit('save')" :disabled="!smsText" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:brightness-110 transition disabled:opacity-40">テンプレートとして保存</button>
           </div>
         </div>
 
         <!-- SMS Preview -->
-        <div class="w-80 shrink-0 bg-slate-50/80 flex flex-col items-center p-6 overflow-y-auto">
-          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">SMS プレビュー</span>
+        <div class="w-80 shrink-0 bg-[#f7f8fa] flex flex-col items-center p-6 overflow-y-auto">
+          <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-4">SMS プレビュー</span>
           <div class="w-[280px] bg-[#1C1C1E] rounded-[2rem] p-3 shadow-xl">
             <div class="bg-[#F2F2F7] rounded-2xl overflow-hidden min-h-[400px]">
-              <div class="bg-[#F2F2F7] px-4 py-3 text-center border-b border-slate-200/40">
-                <span class="text-xs font-bold text-slate-700">SMS</span>
+              <div class="bg-[#F2F2F7] px-4 py-3 text-center border-b border-[#ebedf0]">
+                <span class="text-[12px] font-semibold text-[#6b7280]">SMS</span>
               </div>
               <div class="p-3 min-h-[340px]">
                 <div v-if="smsText" class="flex justify-start mb-2">
@@ -830,21 +830,21 @@ const sendLineTest = async () => {
       </template>
 
       <!-- ==================== Stock list (shared) ==================== -->
-      <aside class="w-56 bg-slate-50/50 border-l border-slate-200/60 overflow-y-auto shrink-0 hidden xl:block">
-        <div class="px-4 py-3 border-b border-slate-200/60">
-          <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">保存済みテンプレート</h3>
+      <aside class="w-56 bg-[#f7f8fa] border-l border-[#ebedf0] overflow-y-auto shrink-0 hidden xl:block">
+        <div class="px-4 py-3 border-b border-[#ebedf0]">
+          <h3 class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">保存済みテンプレート</h3>
         </div>
         <div class="p-3 space-y-2">
           <div v-if="channelTemplates.length === 0" class="flex flex-col items-center justify-center py-8 text-center">
             <div class="text-2xl mb-2">📭</div>
             <p class="text-[10px] text-slate-400">{{ selectedChannel }}のテンプレートはありません</p>
           </div>
-          <div v-for="t in channelTemplates" :key="t.id" class="bg-white p-3 rounded-[14px] border border-[#ebedf0] group">
+          <div v-for="t in channelTemplates" :key="t.id" class="bg-white p-3 rounded-[13px] border border-[#ebedf0] group">
             <div class="flex items-start justify-between gap-1 mb-1">
               <span class="text-[11px] font-bold text-slate-800 leading-snug flex-1 min-w-0">{{ t.title }}</span>
               <button @click="$emit('deleteTemplate', t.id)" class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 w-5 h-5 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 text-[10px]">✕</button>
             </div>
-            <p class="text-[9px] text-slate-400 truncate bg-slate-50 p-1.5 rounded font-mono">{{ t.content }}</p>
+            <p class="text-[9px] text-slate-400 truncate bg-[#f7f8fa] p-1.5 rounded font-mono">{{ t.content }}</p>
           </div>
         </div>
       </aside>
