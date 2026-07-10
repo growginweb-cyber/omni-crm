@@ -63,6 +63,133 @@ export function useCrm() {
   const stepAiResult = ref('')
   const stepAiLoading = ref(false)
 
+  // --- シナリオ格納庫 ---
+  const scenarioDefs = ref([])
+  const selectedScenarioDefId = ref(null)
+  const scenarioItems = ref([])
+  const selectedScenarioItemId = ref(null)
+
+  const selectedScenarioDef = computed(() =>
+    scenarioDefs.value.find(s => s.id === selectedScenarioDefId.value) || null
+  )
+  const selectedScenarioItem = computed(() =>
+    scenarioItems.value.find(s => s.id === selectedScenarioItemId.value) || null
+  )
+
+  const fetchScenarioDefs = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('step_scenario_defs')
+      .select('*')
+      .eq('tenant_id', currentTenantId.value)
+      .order('created_at', { ascending: true })
+    scenarioDefs.value = data || []
+
+    // 初回のみ：既存のstepScenariosから既定シナリオを作成
+    if (scenarioDefs.value.length === 0 && stepScenarios.value.length > 0) {
+      await createScenarioDef('診断完了フォロー', true)
+      for (const s of stepScenarios.value) {
+        await createScenarioItem({
+          scenarioDefId: scenarioDefs.value[0].id,
+          stepNumber: s.step_number,
+          deliveryChannel: s.delivery_channel,
+          templateId: s.template_id || null,
+          delayMinutes: s.delay_minutes,
+        })
+      }
+    }
+    if (!selectedScenarioDefId.value && scenarioDefs.value.length > 0) {
+      await selectScenarioDef(scenarioDefs.value[0].id)
+    }
+  }
+
+  const fetchScenarioItems = async (scenarioDefId) => {
+    if (!scenarioDefId) { scenarioItems.value = []; return }
+    const { data } = await supabase
+      .from('step_scenario_items')
+      .select('*')
+      .eq('scenario_def_id', scenarioDefId)
+      .order('step_number', { ascending: true })
+    scenarioItems.value = data || []
+  }
+
+  const selectScenarioDef = async (id) => {
+    selectedScenarioDefId.value = id
+    selectedScenarioItemId.value = null
+    await fetchScenarioItems(id)
+  }
+
+  const createScenarioDef = async (name, isActive = false) => {
+    if (!name?.trim() || !currentTenantId.value) return
+    const { data } = await supabase.from('step_scenario_defs').insert([{
+      tenant_id: currentTenantId.value,
+      name,
+      is_active: isActive,
+    }]).select().single()
+    if (data) {
+      scenarioDefs.value.push(data)
+      await selectScenarioDef(data.id)
+    }
+  }
+
+  const deleteScenarioDef = async (id) => {
+    await supabase.from('step_scenario_defs').delete().eq('id', id)
+    scenarioDefs.value = scenarioDefs.value.filter(s => s.id !== id)
+    if (selectedScenarioDefId.value === id) {
+      selectedScenarioDefId.value = null
+      scenarioItems.value = []
+      if (scenarioDefs.value.length > 0) await selectScenarioDef(scenarioDefs.value[0].id)
+    }
+  }
+
+  const createScenarioItem = async ({ scenarioDefId, stepNumber, deliveryChannel, templateId, delayMinutes }) => {
+    if (!scenarioDefId || !currentTenantId.value) return
+    const { data } = await supabase.from('step_scenario_items').insert([{
+      tenant_id: currentTenantId.value,
+      scenario_def_id: scenarioDefId,
+      step_number: stepNumber,
+      delivery_channel: deliveryChannel || 'LINE',
+      template_id: templateId || null,
+      delay_minutes: delayMinutes ?? 0,
+    }]).select().single()
+    if (data && scenarioDefId === selectedScenarioDefId.value) scenarioItems.value.push(data)
+    return data
+  }
+
+  const addScenarioItemToSelected = async () => {
+    if (!selectedScenarioDefId.value) return
+    const nextStep = scenarioItems.value.length + 1
+    const item = await createScenarioItem({
+      scenarioDefId: selectedScenarioDefId.value,
+      stepNumber: nextStep,
+      deliveryChannel: 'LINE',
+      delayMinutes: nextStep,
+    })
+    if (item) selectedScenarioItemId.value = item.id
+  }
+
+  const updateScenarioItem = async ({ id, ...fields }) => {
+    const patch = {}
+    if (fields.deliveryChannel !== undefined) patch.delivery_channel = fields.deliveryChannel
+    if (fields.templateId !== undefined) patch.template_id = fields.templateId || null
+    if (fields.delayMinutes !== undefined) patch.delay_minutes = fields.delayMinutes
+    await supabase.from('step_scenario_items').update(patch).eq('id', id)
+    const item = scenarioItems.value.find(i => i.id === id)
+    if (item) Object.assign(item, patch)
+  }
+
+  const deleteScenarioItem = async (id) => {
+    await supabase.from('step_scenario_items').delete().eq('id', id)
+    scenarioItems.value = scenarioItems.value.filter(i => i.id !== id)
+    if (selectedScenarioItemId.value === id) selectedScenarioItemId.value = null
+  }
+
+  const toggleScenarioActive = async (id) => {
+    await supabase.from('step_scenario_defs').update({ is_active: false }).neq('id', id).eq('tenant_id', currentTenantId.value)
+    await supabase.from('step_scenario_defs').update({ is_active: true }).eq('id', id)
+    scenarioDefs.value.forEach(s => { s.is_active = s.id === id })
+  }
+
   // --- タグ・セグメント ---
   const savedSegments = ref([])
   const fetchSavedSegments = async () => {
@@ -351,6 +478,7 @@ export function useCrm() {
         fetchAutoreplyRules(),
         fetchConversations(),
       ])
+      await fetchScenarioDefs()
       // Realtime: step_broadcast_queues の変化を購読
       supabase
         .channel('step-queues-changes')
@@ -913,5 +1041,18 @@ export function useCrm() {
     isSendingInbox,
     selectConversation,
     sendInboxMessage,
+    scenarioDefs,
+    selectedScenarioDefId,
+    selectedScenarioDef,
+    scenarioItems,
+    selectedScenarioItemId,
+    selectedScenarioItem,
+    selectScenarioDef,
+    createScenarioDef,
+    deleteScenarioDef,
+    addScenarioItemToSelected,
+    updateScenarioItem,
+    deleteScenarioItem,
+    toggleScenarioActive,
   }
 }
