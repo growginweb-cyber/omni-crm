@@ -99,7 +99,15 @@ serve(async (req) => {
       // メッセージイベント（ユーザーの回答）
       if (event.type === 'message' && event.message?.type === 'text') {
         const text = event.message.text.trim()
-        await processUserAnswer(supabase, tenantId, existingCustomer, text, lineUid, LINE_ACCESS_TOKEN)
+
+        // 受信トレイへ保存（会話がなければ新規作成）
+        const conversationId = await logInboundMessage(supabase, tenantId, existingCustomer.id, 'LINE', text)
+
+        // 自動応答ルールとのマッチングを試行
+        const replied = await tryAutoReply(supabase, tenantId, 'LINE', text, lineUid, LINE_ACCESS_TOKEN, conversationId)
+        if (!replied) {
+          await processUserAnswer(supabase, tenantId, existingCustomer, text, lineUid, LINE_ACCESS_TOKEN)
+        }
       }
 
       // ポストバックイベント（ボタンタップ）
@@ -120,6 +128,95 @@ serve(async (req) => {
     })
   }
 })
+
+async function logInboundMessage(
+  supabase: ReturnType<typeof createClient>,
+  tenantId: string,
+  customerId: string,
+  channel: string,
+  text: string,
+) {
+  let { data: conversation } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('customer_id', customerId)
+    .eq('channel', channel)
+    .maybeSingle()
+
+  if (!conversation) {
+    const { data: created } = await supabase
+      .from('conversations')
+      .insert([{ tenant_id: tenantId, customer_id: customerId, channel, status: '未対応', unread: true }])
+      .select('id')
+      .single()
+    conversation = created
+  } else {
+    await supabase.from('conversations').update({ last_message_at: new Date().toISOString(), unread: true }).eq('id', conversation.id)
+  }
+
+  if (conversation) {
+    await supabase.from('inbox_messages').insert([{
+      tenant_id: tenantId,
+      conversation_id: conversation.id,
+      direction: 'inbound',
+      channel,
+      content: text,
+    }])
+  }
+
+  return conversation?.id ?? null
+}
+
+async function tryAutoReply(
+  supabase: ReturnType<typeof createClient>,
+  tenantId: string,
+  channel: string,
+  text: string,
+  lineUid: string,
+  token: string,
+  conversationId: string | null,
+) {
+  const { data: rules } = await supabase
+    .from('autoreply_rules')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('channel', channel)
+    .eq('enabled', true)
+
+  if (!rules || rules.length === 0) return false
+
+  const lowerText = text.toLowerCase()
+  const matched = rules.find((r: { keyword: string; match_type: string }) => {
+    const kw = (r.keyword || '').toLowerCase()
+    if (!kw) return false
+    return r.match_type === '完全一致' ? lowerText === kw : lowerText.includes(kw)
+  })
+
+  if (!matched || !matched.reply_content) return false
+
+  await fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ to: lineUid, messages: [{ type: 'text', text: matched.reply_content }] }),
+  })
+
+  await supabase.from('autoreply_rules').update({ hit_count: (matched.hit_count || 0) + 1 }).eq('id', matched.id)
+
+  if (conversationId) {
+    await supabase.from('inbox_messages').insert([{
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      direction: 'outbound',
+      channel,
+      content: matched.reply_content,
+    }])
+    await supabase.from('conversations').update({ last_message_at: new Date().toISOString() }).eq('id', conversationId)
+  }
+
+  console.log(`[自動応答] キーワード「${matched.keyword}」にマッチ → 自動返信送信`)
+  return true
+}
 
 async function getActiveFlow(supabase: ReturnType<typeof createClient>, tenantId: string) {
   const { data } = await supabase
