@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   totalStats: Object,
   channelStats: Object,
@@ -49,25 +51,116 @@ const taskChannel = (task) => {
   return task?.delivery_channel || task?.broadcast_templates?.delivery_channel || 'LINE'
 }
 
-// Stacked bar chart: 7 days, simulated distribution of channelStats across days
-const days = ['月', '火', '水', '木', '金', '土', '日']
-const barData = () => {
-  const total = Object.values(props.channelStats || {}).reduce((a, b) => a + b, 0) || 0
-  return days.map((day, i) => {
-    // Distribute semi-randomly by index
-    const seeds = [0.18, 0.12, 0.16, 0.14, 0.20, 0.11, 0.09]
-    const dayTotal = total * seeds[i]
-    const lineCount = (props.channelStats?.LINE || 0) * seeds[i]
-    const emailCount = (props.channelStats?.Email || 0) * seeds[i]
-    const smsCount = (props.channelStats?.SMS || 0) * seeds[i]
-    const max = total * 0.20
-    return {
-      day,
-      line: max > 0 ? (lineCount / max) * 100 : 20,
-      email: max > 0 ? (emailCount / max) * 100 : 10,
-      sms: max > 0 ? (smsCount / max) * 100 : 5,
-    }
+// KPI cards: friend count first (Lステップ/エルグラ style)
+const kpiCards = computed(() => [
+  {
+    label: '友だち数',
+    value: props.customers?.length ?? 0,
+    unit: '人',
+    icon: '👥',
+    iconBg: '#eef2ff',
+    valueColor: 'text-slate-900',
+  },
+  {
+    label: '総送信数',
+    value: props.totalStats?.sent ?? 0,
+    unit: '通',
+    icon: '📤',
+    iconBg: '#f0f4ff',
+    valueColor: 'text-slate-900',
+  },
+  {
+    label: '到達率',
+    value: deliveryRate(),
+    unit: '%',
+    icon: '✅',
+    iconBg: '#e6f8ee',
+    valueColor: 'text-emerald-600',
+  },
+  {
+    label: '開封率',
+    value: openRate(),
+    unit: '%',
+    icon: '👁️',
+    iconBg: '#ececfd',
+    valueColor: 'text-indigo-600',
+  },
+  {
+    label: 'CTR',
+    value: ctr(),
+    unit: '%',
+    icon: '🖱️',
+    iconBg: '#e8efff',
+    valueColor: 'text-blue-600',
+  },
+])
+
+// 友だち成長グラフ（顧客の登録日を日次累積）
+const friendGrowth = computed(() => {
+  const list = props.customers || []
+  if (list.length === 0) return { points: '', area: '', dots: [], labels: [] }
+  const sorted = [...list]
+    .filter(c => c.created_at)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  if (sorted.length === 0) return { points: '', area: '', dots: [], labels: [] }
+
+  const days = 14
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const buckets = []
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    buckets.push(d)
+  }
+  const cumulative = buckets.map(bucketDate => {
+    const cutoff = new Date(bucketDate)
+    cutoff.setHours(23, 59, 59, 999)
+    return sorted.filter(c => new Date(c.created_at) <= cutoff).length
   })
+
+  const w = 600
+  const h = 120
+  const max = Math.max(...cumulative, 1)
+  const min = Math.min(...cumulative)
+  const range = Math.max(max - min, 1)
+  const stepX = w / (days - 1)
+
+  const dots = cumulative.map((v, i) => ({
+    cx: Math.round(i * stepX),
+    cy: Math.round(h - ((v - min) / range) * (h - 16) - 8),
+    v,
+    day: buckets[i].getMonth() + 1 + '/' + buckets[i].getDate(),
+  }))
+  const points = dots.map(p => `${p.cx},${p.cy}`).join(' ')
+  const area = `0,${h} ${points} ${w},${h}`
+
+  return { points, area, dots, w, h }
+})
+
+const channelDeliveries = computed(() => {
+  const total = Object.values(props.channelStats || {}).reduce((a, b) => a + b, 0) || 1
+  return [
+    { key: 'LINE', label: 'LINE', color: '#06C755', count: props.channelStats?.LINE || 0 },
+    { key: 'Email', label: 'メール', color: '#3B6EF5', count: props.channelStats?.Email || 0 },
+    { key: 'SMS', label: 'SMS', color: '#8B5CF6', count: props.channelStats?.SMS || 0 },
+  ].map(c => ({ ...c, pct: Math.round((c.count / total) * 100) }))
+})
+
+const segmentBreakdown = computed(() => {
+  const map = {}
+  ;(props.customers || []).forEach(c => {
+    const seg = c.segment || '未診断'
+    map[seg] = (map[seg] || 0) + 1
+  })
+  const colors = { '集客最大化タイプ': '#06914a', 'コスト削減タイプ': '#d97706', '未診断': '#9097a1' }
+  return Object.entries(map).map(([name, count]) => ({ name, count, color: colors[name] || '#4f46e5' }))
+})
+
+const avatarColor = (str) => {
+  const colors = ['#4f46e5', '#06914a', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#db2777']
+  const code = (str || '').charCodeAt(0) || 0
+  return colors[code % colors.length]
 }
 
 // Funnel
@@ -94,105 +187,129 @@ const channelRow = (ch) => {
 </script>
 
 <template>
-  <div class="flex-1 overflow-y-auto bg-[#fbfbfc]">
+  <div class="flex-1 overflow-y-auto bg-[#f7f8fb]">
     <!-- Sticky header -->
-    <div class="sticky top-0 z-20 bg-[#fbfbfc] border-b border-[#ebedf0] px-6 lg:px-7 py-3 flex items-center justify-between">
+    <div class="sticky top-0 z-20 bg-[#f7f8fb]/90 backdrop-blur-sm border-b border-[#ebedf0] px-6 lg:px-7 py-3.5 flex items-center justify-between">
       <div>
         <h2 class="text-base font-bold text-slate-900 tracking-tight">ダッシュボード</h2>
-        <p class="text-[11px] text-[#9097a1]">過去30日間</p>
+        <p class="text-[11px] text-[#9097a1] mt-0.5">過去30日間のパフォーマンス概要</p>
       </div>
       <div class="flex items-center gap-2">
-        <button class="border border-[#ebedf0] bg-white rounded-lg px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-[#f7f8fa] transition-colors">期間: 30日</button>
-        <button class="bg-indigo-600 text-white rounded-lg px-3 py-1.5 text-[11px] font-bold hover:bg-indigo-700 transition-colors">レポート出力</button>
+        <button class="border border-[#e6e8ec] bg-white rounded-lg px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-[#f7f8fa] transition-colors shadow-[0_1px_2px_rgba(20,24,31,.04)]">期間: 30日</button>
+        <button class="bg-indigo-600 text-white rounded-lg px-3 py-1.5 text-[11px] font-bold hover:bg-indigo-700 transition-colors shadow-[0_1px_2px_rgba(79,70,229,.3)]">レポート出力</button>
       </div>
     </div>
 
-    <div class="max-w-[1280px] mx-auto p-6 lg:p-7 space-y-[14px]">
+    <div class="max-w-[1320px] mx-auto p-6 lg:p-7 space-y-4">
       <!-- KPI Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-[14px]">
-        <!-- 総送信数 -->
-        <div class="bg-white border border-[#ebedf0] rounded-[14px] p-[18px]">
-          <div class="text-[11.5px] font-medium text-[#9097a1]">総送信数</div>
-          <div class="text-[26px] font-mono font-semibold text-slate-900 tracking-tight mt-1 tabular-nums">
-            {{ totalStats?.sent ?? 0 }}<span class="text-xs text-slate-400 font-normal ml-1">通</span>
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <div
+          v-for="k in kpiCards"
+          :key="k.label"
+          class="bg-white rounded-[16px] p-[18px] shadow-[0_1px_3px_rgba(20,24,31,.06)] border border-[#f0f1f3] hover:shadow-[0_4px_16px_rgba(20,24,31,.08)] transition-shadow"
+        >
+          <div class="flex items-center justify-between mb-2.5">
+            <span class="text-[11.5px] font-semibold text-[#7d8590]">{{ k.label }}</span>
+            <div class="w-8 h-8 rounded-[10px] flex items-center justify-center text-[15px]" :style="{ background: k.iconBg }">{{ k.icon }}</div>
           </div>
-          <div class="text-[10.5px] text-slate-400 mt-1">— <span class="text-[#b0b6bf]">前期比</span></div>
-        </div>
-        <!-- 到達率 -->
-        <div class="bg-white border border-[#ebedf0] rounded-[14px] p-[18px]">
-          <div class="text-[11.5px] font-medium text-[#9097a1]">到達率</div>
-          <div class="text-[26px] font-mono font-semibold text-emerald-600 tracking-tight mt-1 tabular-nums">
-            {{ deliveryRate() }}<span class="text-xs text-slate-400 font-normal ml-0.5">%</span>
+          <div :class="['text-[27px] font-bold tracking-tight tabular-nums font-mono', k.valueColor]">
+            {{ k.value }}<span class="text-xs text-slate-400 font-normal ml-1">{{ k.unit }}</span>
           </div>
-          <div class="text-[10.5px] text-slate-400 mt-1">— <span class="text-[#b0b6bf]">前期比</span></div>
-        </div>
-        <!-- 開封率 -->
-        <div class="bg-white border border-[#ebedf0] rounded-[14px] p-[18px]">
-          <div class="text-[11.5px] font-medium text-[#9097a1]">開封率</div>
-          <div class="text-[26px] font-mono font-semibold text-indigo-600 tracking-tight mt-1 tabular-nums">
-            {{ openRate() }}<span class="text-xs text-slate-400 font-normal ml-0.5">%</span>
-          </div>
-          <div class="text-[10.5px] text-slate-400 mt-1">— <span class="text-[#b0b6bf]">前期比</span></div>
-        </div>
-        <!-- CTR -->
-        <div class="bg-white border border-[#ebedf0] rounded-[14px] p-[18px]">
-          <div class="text-[11.5px] font-medium text-[#9097a1]">CTR</div>
-          <div class="text-[26px] font-mono font-semibold text-blue-600 tracking-tight mt-1 tabular-nums">
-            {{ ctr() }}<span class="text-xs text-slate-400 font-normal ml-0.5">%</span>
-          </div>
-          <div class="text-[10.5px] text-slate-400 mt-1">— <span class="text-[#b0b6bf]">前期比</span></div>
         </div>
       </div>
 
-      <!-- Middle row: chart + activity -->
-      <div class="grid grid-cols-1 lg:grid-cols-5 gap-[14px]">
-        <!-- Channel stacked bar chart (3 cols) -->
-        <div class="lg:col-span-3 bg-white border border-[#ebedf0] rounded-[14px] p-[18px]">
-          <div class="text-[10px] font-bold text-[#9097a1] uppercase tracking-wider mb-4">チャネル別 メッセージ数</div>
-          <!-- Chart -->
-          <div class="flex items-end gap-[6px] h-[100px]">
-            <div v-for="bar in barData()" :key="bar.day" class="flex-1 h-full flex flex-col justify-end gap-0">
-              <div :style="{ height: bar.sms + '%', background: '#8B5CF6', minHeight: bar.sms > 0 ? '2px' : '0' }" class="w-full rounded-t-[2px]"></div>
-              <div :style="{ height: bar.email + '%', background: '#3B6EF5', minHeight: bar.email > 0 ? '2px' : '0' }" class="w-full"></div>
-              <div :style="{ height: bar.line + '%', background: '#06C755', minHeight: bar.line > 0 ? '2px' : '0' }" class="w-full rounded-b-[2px]"></div>
+      <!-- 友だち成長グラフ -->
+      <div class="bg-white rounded-[16px] p-[20px] shadow-[0_1px_3px_rgba(20,24,31,.06)] border border-[#f0f1f3]">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-[13px] font-bold text-slate-800">友だち数の推移</h3>
+          <span class="text-[11px] text-[#9097a1]">直近14日間（累計）</span>
+        </div>
+        <div v-if="friendGrowth.dots && friendGrowth.dots.length > 0" class="mt-3">
+          <svg :viewBox="`0 0 ${friendGrowth.w} ${friendGrowth.h}`" class="w-full h-[130px]" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.18" />
+                <stop offset="100%" stop-color="#4f46e5" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <polygon :points="friendGrowth.area" fill="url(#growthGradient)" />
+            <polyline :points="friendGrowth.points" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+            <circle
+              v-for="(p, i) in friendGrowth.dots"
+              :key="i"
+              :cx="p.cx"
+              :cy="p.cy"
+              r="3"
+              fill="#fff"
+              stroke="#4f46e5"
+              stroke-width="2"
+            />
+          </svg>
+          <div class="flex justify-between mt-1 px-0.5">
+            <span
+              v-for="(p, i) in friendGrowth.dots"
+              :key="'label-' + i"
+              v-show="i % 2 === 0"
+              class="text-[9.5px] text-[#b0b6bf] font-mono"
+            >{{ p.day }}</span>
+          </div>
+        </div>
+        <div v-else class="h-[130px] flex items-center justify-center text-xs text-[#9097a1]">友だちデータがまだありません</div>
+      </div>
+
+      <!-- Middle row: channel breakdown + activity -->
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-3.5">
+        <!-- Channel delivery breakdown (2 cols) -->
+        <div class="lg:col-span-2 bg-white rounded-[16px] p-[20px] shadow-[0_1px_3px_rgba(20,24,31,.06)] border border-[#f0f1f3]">
+          <h3 class="text-[13px] font-bold text-slate-800 mb-4">チャネル別配信比率</h3>
+          <div class="space-y-4">
+            <div v-for="c in channelDeliveries" :key="c.key">
+              <div class="flex items-center justify-between text-xs mb-1.5">
+                <span class="flex items-center gap-1.5 font-semibold text-slate-700">
+                  <span class="w-2 h-2 rounded-full" :style="{ background: c.color }"></span>
+                  {{ c.label }}
+                </span>
+                <span class="font-mono text-slate-500 tabular-nums">{{ c.count }}通 ・ {{ c.pct }}%</span>
+              </div>
+              <div class="w-full bg-[#f1f2f4] h-2 rounded-full overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-700" :style="{ width: c.pct + '%', background: c.color }"></div>
+              </div>
             </div>
           </div>
-          <!-- Day labels -->
-          <div class="flex gap-[6px] mt-1">
-            <div v-for="bar in barData()" :key="bar.day + '-label'" class="flex-1 text-center text-[9px] text-[#9097a1]">{{ bar.day }}</div>
-          </div>
-          <!-- Legend -->
-          <div class="flex items-center gap-4 mt-4">
-            <div class="flex items-center gap-1.5">
-              <div class="w-[9px] h-[9px] rounded-[2px]" style="background:#06C755"></div>
-              <span class="text-[10px] text-slate-500">LINE</span>
+
+          <div class="h-px bg-[#f0f1f3] my-5"></div>
+
+          <h3 class="text-[13px] font-bold text-slate-800 mb-3">セグメント別友だち数</h3>
+          <div class="flex flex-wrap gap-2">
+            <div
+              v-for="s in segmentBreakdown"
+              :key="s.name"
+              class="flex items-center gap-1.5 bg-[#f7f8fa] rounded-full pl-2 pr-3 py-1.5 border border-[#f0f1f3]"
+            >
+              <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: s.color }"></span>
+              <span class="text-[11px] font-medium text-slate-700">{{ s.name }}</span>
+              <span class="text-[11px] font-mono font-bold text-slate-900">{{ s.count }}</span>
             </div>
-            <div class="flex items-center gap-1.5">
-              <div class="w-[9px] h-[9px] rounded-[2px]" style="background:#3B6EF5"></div>
-              <span class="text-[10px] text-slate-500">メール</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-              <div class="w-[9px] h-[9px] rounded-[2px]" style="background:#8B5CF6"></div>
-              <span class="text-[10px] text-slate-500">SMS</span>
-            </div>
+            <div v-if="segmentBreakdown.length === 0" class="text-xs text-[#9097a1]">データがありません</div>
           </div>
         </div>
 
-        <!-- Recent activity (2 cols) -->
-        <div class="lg:col-span-2 bg-white border border-[#ebedf0] rounded-[14px] p-[18px] flex flex-col">
-          <div class="text-[10px] font-bold text-[#9097a1] uppercase tracking-wider mb-3">最近のアクティビティ</div>
+        <!-- Recent activity (3 cols) -->
+        <div class="lg:col-span-3 bg-white rounded-[16px] p-[20px] shadow-[0_1px_3px_rgba(20,24,31,.06)] border border-[#f0f1f3] flex flex-col">
+          <h3 class="text-[13px] font-bold text-slate-800 mb-3">最近のアクティビティ</h3>
           <div v-if="recentBroadcasts().length === 0" class="flex-1 flex flex-col items-center justify-center py-8 text-center">
+            <div class="text-2xl mb-2">📭</div>
             <p class="text-xs text-slate-400">配信履歴はまだありません</p>
           </div>
-          <div v-else class="divide-y divide-[#ebedf0]">
-            <div v-for="task in recentBroadcasts()" :key="task.id" class="py-2.5 flex items-start gap-2.5 hover:bg-[#f7f8fa] transition-colors -mx-2 px-2 rounded-lg">
+          <div v-else class="divide-y divide-[#f4f5f6]">
+            <div v-for="task in recentBroadcasts()" :key="task.id" class="py-3 flex items-start gap-3 hover:bg-[#f7f8fa] transition-colors -mx-2 px-2 rounded-[10px]">
               <div
-                class="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                class="w-8 h-8 rounded-[9px] flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-[0_1px_2px_rgba(0,0,0,.15)]"
                 :style="{ background: channelChip(taskChannel(task)).bg }"
               >{{ channelChip(taskChannel(task)).label }}</div>
               <div class="min-w-0 flex-1">
-                <div class="text-[11px] font-bold text-slate-800 truncate">{{ task.title }} <span class="font-normal text-slate-600">を配信しました</span></div>
-                <div class="text-[10px] mt-0.5" style="color:#b0b6bf">{{ formatTime(task.scheduled_at || task.created_at) }}</div>
+                <div class="text-[12px] font-semibold text-slate-800 truncate">{{ task.title }} <span class="font-normal text-slate-500">を配信しました</span></div>
+                <div class="text-[10.5px] mt-0.5 text-[#b0b6bf]">{{ formatTime(task.scheduled_at || task.created_at) }}</div>
               </div>
             </div>
           </div>
@@ -200,11 +317,11 @@ const channelRow = (ch) => {
       </div>
 
       <!-- Bottom row: funnel + CV table -->
-      <div class="grid grid-cols-1 lg:grid-cols-5 gap-[14px]">
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-3.5">
         <!-- Funnel (2 cols) -->
-        <div class="lg:col-span-2 bg-white border border-[#ebedf0] rounded-[14px] p-[18px]">
-          <div class="text-[10px] font-bold text-[#9097a1] uppercase tracking-wider mb-4">配信→CV ファネル</div>
-          <div class="space-y-3">
+        <div class="lg:col-span-2 bg-white rounded-[16px] p-[20px] shadow-[0_1px_3px_rgba(20,24,31,.06)] border border-[#f0f1f3]">
+          <h3 class="text-[13px] font-bold text-slate-800 mb-4">配信→CV ファネル</h3>
+          <div class="space-y-3.5">
             <div v-for="(row, i) in [
               { label: '送信', value: totalStats?.sent ?? 0, color: '#4f46e5' },
               { label: '到達', value: totalStats?.delivered ?? 0, color: '#06C755' },
@@ -213,27 +330,27 @@ const channelRow = (ch) => {
               { label: 'CV', value: 0, color: '#f59e0b' },
             ]" :key="i">
               <div class="flex items-center gap-3">
-                <div class="text-[11px] text-slate-500 w-12 shrink-0">{{ row.label }}</div>
-                <div class="flex-1 bg-[#f3f4f6] rounded-full h-2 overflow-hidden">
+                <div class="text-[11px] font-medium text-slate-500 w-12 shrink-0">{{ row.label }}</div>
+                <div class="flex-1 bg-[#f1f2f4] rounded-full h-2.5 overflow-hidden">
                   <div
-                    class="h-full rounded-full transition-all duration-500"
+                    class="h-full rounded-full transition-all duration-700"
                     :style="{
                       width: funnelMax() > 0 ? Math.max(2, Math.round((row.value / funnelMax()) * 100)) + '%' : '2%',
                       background: row.color,
                     }"
                   ></div>
                 </div>
-                <div class="text-[11px] font-mono text-slate-600 tabular-nums w-10 text-right">{{ row.value }}</div>
+                <div class="text-[11px] font-mono font-semibold text-slate-700 tabular-nums w-10 text-right">{{ row.value }}</div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- CV table (3 cols) -->
-        <div class="lg:col-span-3 bg-white border border-[#ebedf0] rounded-[14px] p-[18px]">
-          <div class="text-[10px] font-bold text-[#9097a1] uppercase tracking-wider mb-4">チャネル別 CV指標</div>
+        <div class="lg:col-span-3 bg-white rounded-[16px] p-[20px] shadow-[0_1px_3px_rgba(20,24,31,.06)] border border-[#f0f1f3]">
+          <h3 class="text-[13px] font-bold text-slate-800 mb-4">チャネル別 CV指標</h3>
           <!-- Header -->
-          <div class="grid grid-cols-5 gap-2 text-[9.5px] font-bold text-[#9097a1] uppercase tracking-wider pb-2 border-b border-[#ebedf0]">
+          <div class="grid grid-cols-5 gap-2 text-[9.5px] font-bold text-[#9097a1] uppercase tracking-wider pb-2 border-b border-[#f0f1f3]">
             <div>CH</div>
             <div class="text-right">配信数</div>
             <div class="text-right">開封率</div>
@@ -241,7 +358,7 @@ const channelRow = (ch) => {
             <div class="text-right">CVR</div>
           </div>
           <!-- Rows -->
-          <div v-for="ch in ['LINE', 'Email', 'SMS']" :key="ch" class="grid grid-cols-5 gap-2 py-2.5 border-b border-[#ebedf0] last:border-0 hover:bg-[#f7f8fa] -mx-2 px-2 rounded-lg transition-colors items-center">
+          <div v-for="ch in ['LINE', 'Email', 'SMS']" :key="ch" class="grid grid-cols-5 gap-2 py-2.5 border-b border-[#f4f5f6] last:border-0 hover:bg-[#f7f8fa] -mx-2 px-2 rounded-[10px] transition-colors items-center">
             <div class="flex items-center gap-1.5">
               <!-- Shape: LINE=square, Email=diamond, SMS=circle -->
               <div v-if="ch === 'LINE'" class="w-2 h-2 rounded-[2px]" style="background:#06C755"></div>
