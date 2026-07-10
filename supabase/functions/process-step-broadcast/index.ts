@@ -33,6 +33,58 @@ serve(async (req) => {
         const now = new Date().toISOString()
         console.log(`[自動ステップエンジン起動] 現在時刻: ${now}`)
 
+        // 0. 滞留検知シナリオの評価（例: 会員登録のまま3日間、面談予約に進まない候補者を自動フォロー）
+        const { data: inactivityScenarios } = await supabase
+            .from('step_scenario_defs')
+            .select('*, step_scenario_items(*)')
+            .eq('is_active', true)
+            .not('trigger_stage', 'is', null)
+            .not('trigger_days', 'is', null)
+
+        for (const scenario of inactivityScenarios || []) {
+            const thresholdDate = new Date(Date.now() - scenario.trigger_days * 24 * 60 * 60 * 1000).toISOString()
+
+            const { data: staleCustomers } = await supabase
+                .from('customers')
+                .select('id, tenant_id, name')
+                .eq('tenant_id', scenario.tenant_id)
+                .eq('pipeline_stage', scenario.trigger_stage)
+                .lte('created_at', thresholdDate)
+
+            if (!staleCustomers || staleCustomers.length === 0) continue
+
+            const items = (scenario.step_scenario_items || []).sort((a: any, b: any) => a.step_number - b.step_number)
+            if (items.length === 0) continue
+
+            for (const customer of staleCustomers) {
+                // 既にこのシナリオでキュー登録済みなら再送しない
+                const { data: existing } = await supabase
+                    .from('step_broadcast_queues')
+                    .select('id')
+                    .eq('customer_id', customer.id)
+                    .eq('scenario_def_id', scenario.id)
+                    .limit(1)
+
+                if (existing && existing.length > 0) continue
+
+                console.log(`[滞留検知] ${customer.name} が「${scenario.trigger_stage}」に${scenario.trigger_days}日以上滞留 → シナリオ「${scenario.name}」を起動`)
+
+                const nowMs = Date.now()
+                const insertData = items.map((item: any) => ({
+                    tenant_id: customer.tenant_id,
+                    customer_id: customer.id,
+                    step_number: item.step_number,
+                    delivery_channel: item.delivery_channel,
+                    template_id: item.template_id || null,
+                    scheduled_at: new Date(nowMs + (item.delay_minutes || 0) * 60 * 1000).toISOString(),
+                    status: '未送信',
+                    scenario_def_id: scenario.id,
+                }))
+
+                await supabase.from('step_broadcast_queues').insert(insertData)
+            }
+        }
+
         // 1. 未送信の予約タスクを取得
         const { data: pendingQueues, error: fetchError } = await supabase
             .from('step_broadcast_queues')

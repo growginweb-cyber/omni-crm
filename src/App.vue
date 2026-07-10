@@ -99,6 +99,8 @@ const crm = useCrm()
         :selectedSegment="crm.selectedSegment.value"
         :selectedCustomer="crm.selectedCustomer.value"
         :stepQueues="crm.stepQueues.value"
+        :pipelineStages="crm.pipelineStages"
+        :teamMembers="crm.teamMembers.value"
         @update:selectedSegment="crm.selectedSegment.value = $event"
         @update:selectedCustomer="crm.selectedCustomer.value = $event"
         @openModal="crm.isModalOpen.value = true"
@@ -106,6 +108,8 @@ const crm = useCrm()
         @updateSegment="crm.updateCustomerSegment"
         @addTag="crm.addCustomerTag"
         @removeTag="crm.removeCustomerTag"
+        @updateStage="crm.updateCustomerStage"
+        @assignRecruiter="crm.assignRecruiter"
       />
 
       <ScenariosTab
@@ -121,6 +125,7 @@ const crm = useCrm()
         :stepAiPrompt="crm.stepAiPrompt.value"
         :stepAiResult="crm.stepAiResult.value"
         :stepAiLoading="crm.stepAiLoading.value"
+        :pipelineStages="crm.pipelineStages"
         @selectScenarioDef="crm.selectScenarioDef"
         @createScenarioDef="crm.createScenarioDef"
         @deleteScenarioDef="crm.deleteScenarioDef"
@@ -129,6 +134,7 @@ const crm = useCrm()
         @updateScenarioItem="crm.updateScenarioItem"
         @deleteScenarioItem="crm.deleteScenarioItem"
         @toggleScenarioActive="crm.toggleScenarioActive"
+        @updateScenarioTrigger="crm.updateScenarioTrigger"
         @update:stepAiPrompt="crm.stepAiPrompt.value = $event"
         @generateStepContent="crm.generateStepContent"
       />

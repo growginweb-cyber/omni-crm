@@ -132,6 +132,17 @@ export function useCrm() {
     }
   }
 
+  const updateScenarioTrigger = async ({ id, triggerType, triggerStage, triggerDays }) => {
+    const patch = {
+      trigger_type: triggerType,
+      trigger_stage: triggerType === '滞留検知' ? triggerStage : null,
+      trigger_days: triggerType === '滞留検知' ? triggerDays : null,
+    }
+    await supabase.from('step_scenario_defs').update(patch).eq('id', id)
+    const def = scenarioDefs.value.find(s => s.id === id)
+    if (def) Object.assign(def, patch)
+  }
+
   const deleteScenarioDef = async (id) => {
     await supabase.from('step_scenario_defs').delete().eq('id', id)
     scenarioDefs.value = scenarioDefs.value.filter(s => s.id !== id)
@@ -418,6 +429,49 @@ export function useCrm() {
     if (customers.value.length > 0) selectedCustomer.value = customers.value[0]
   }
 
+  // --- 人材業界: 選考パイプライン・担当者アサイン ---
+  const pipelineStages = ['会員登録', '面談予約', '面談実施', '内定', '就業']
+  const teamMembers = ref([])
+
+  const fetchTeamMembers = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, display_name')
+      .eq('tenant_id', currentTenantId.value)
+    teamMembers.value = data || []
+  }
+
+  const updateCustomerStage = async ({ id, stage }) => {
+    await supabase.from('customers').update({ pipeline_stage: stage, last_contacted_at: new Date().toISOString() }).eq('id', id)
+    const c = customers.value.find(c => c.id === id)
+    if (c) c.pipeline_stage = stage
+    if (selectedCustomer.value?.id === id) selectedCustomer.value = { ...selectedCustomer.value, pipeline_stage: stage }
+  }
+
+  const assignRecruiter = async ({ id, recruiterId }) => {
+    await supabase.from('customers').update({ assigned_to: recruiterId || null }).eq('id', id)
+    const c = customers.value.find(c => c.id === id)
+    if (c) c.assigned_to = recruiterId || null
+    if (selectedCustomer.value?.id === id) selectedCustomer.value = { ...selectedCustomer.value, assigned_to: recruiterId || null }
+  }
+
+  // 開封・クリックの多さと最終接触からの経過日数からスコアを算出（0-100）
+  const engagementScore = (customer) => {
+    if (!customer) return 0
+    let score = 0
+    const stageWeight = { '会員登録': 10, '面談予約': 30, '面談実施': 55, '内定': 80, '就業': 100 }
+    score = stageWeight[customer.pipeline_stage] || 0
+    if (customer.last_contacted_at) {
+      const days = (Date.now() - new Date(customer.last_contacted_at).getTime()) / 86400000
+      if (days > 14) score -= 20
+      else if (days > 7) score -= 10
+    } else {
+      score -= 15
+    }
+    return Math.max(0, Math.min(100, score))
+  }
+
   const fetchStepQueues = async () => {
     if (!currentTenantId.value) return
     const { data } = await supabase
@@ -479,6 +533,7 @@ export function useCrm() {
         fetchConversations(),
       ])
       await fetchScenarioDefs()
+      await fetchTeamMembers()
       // Realtime: step_broadcast_queues の変化を購読
       supabase
         .channel('step-queues-changes')
@@ -1054,5 +1109,11 @@ export function useCrm() {
     updateScenarioItem,
     deleteScenarioItem,
     toggleScenarioActive,
+    updateScenarioTrigger,
+    pipelineStages,
+    teamMembers,
+    updateCustomerStage,
+    assignRecruiter,
+    engagementScore,
   }
 }

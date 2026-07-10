@@ -6,11 +6,53 @@ const props = defineProps({
   selectedSegment: String,
   selectedCustomer: Object,
   stepQueues: Array,
+  pipelineStages: Array,
+  teamMembers: Array,
 })
-const emit = defineEmits(['update:selectedSegment', 'update:selectedCustomer', 'openModal', 'fetchCustomers', 'updateSegment', 'addTag', 'removeTag'])
+const emit = defineEmits(['update:selectedSegment', 'update:selectedCustomer', 'openModal', 'fetchCustomers', 'updateSegment', 'addTag', 'removeTag', 'updateStage', 'assignRecruiter'])
 
 const searchQuery = ref('')
 const tagFilter = ref('')
+const viewMode = ref('list') // list | pipeline
+
+const engagementScore = (customer) => {
+  if (!customer) return 0
+  const stageWeight = { '会員登録': 10, '面談予約': 30, '面談実施': 55, '内定': 80, '就業': 100 }
+  let score = stageWeight[customer.pipeline_stage] || 0
+  if (customer.last_contacted_at) {
+    const days = (Date.now() - new Date(customer.last_contacted_at).getTime()) / 86400000
+    if (days > 14) score -= 20
+    else if (days > 7) score -= 10
+  } else {
+    score -= 15
+  }
+  return Math.max(0, Math.min(100, score))
+}
+
+const scoreColor = (score) => {
+  if (score >= 70) return '#06914a'
+  if (score >= 40) return '#d97706'
+  return '#dc2626'
+}
+
+const daysInStage = (customer) => {
+  const base = customer.last_contacted_at || customer.created_at
+  if (!base) return 0
+  return Math.floor((Date.now() - new Date(base).getTime()) / 86400000)
+}
+
+const recruiterName = (id) => {
+  const m = (props.teamMembers || []).find(m => m.id === id)
+  return m?.display_name || m?.id?.slice(0, 8) || '未担当'
+}
+
+const pipelineColumns = computed(() => {
+  const stages = props.pipelineStages || ['会員登録', '面談予約', '面談実施', '内定', '就業']
+  return stages.map(stage => ({
+    stage,
+    items: filteredCustomers.value.filter(c => (c.pipeline_stage || '会員登録') === stage),
+  }))
+})
 
 const allTags = computed(() => {
   if (!props.customers) return []
@@ -93,7 +135,19 @@ const addTag = () => {
             <h2 class="text-[16px] font-semibold text-[#1b1f24]">顧客管理</h2>
             <span class="font-mono text-[11px] text-[#9097a1]">{{ filteredCustomers.length }}件</span>
           </div>
-          <button @click="$emit('openModal')" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:bg-[#4338ca] transition-colors">＋ 顧客を追加</button>
+          <div class="flex items-center gap-2">
+            <div class="flex bg-[#f1f2f4] rounded-[9px] p-[3px]">
+              <button
+                @click="viewMode = 'list'"
+                :class="['px-2.5 py-1 text-[11px] font-semibold rounded-[7px] transition-colors', viewMode === 'list' ? 'bg-white text-[#4f46e5] shadow-sm' : 'text-[#9097a1]']"
+              >リスト</button>
+              <button
+                @click="viewMode = 'pipeline'"
+                :class="['px-2.5 py-1 text-[11px] font-semibold rounded-[7px] transition-colors', viewMode === 'pipeline' ? 'bg-white text-[#4f46e5] shadow-sm' : 'text-[#9097a1]']"
+              >パイプライン</button>
+            </div>
+            <button @click="$emit('openModal')" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:bg-[#4338ca] transition-colors">＋ 顧客を追加</button>
+          </div>
         </div>
         <div class="flex items-center gap-2">
           <div class="flex-1 flex items-center gap-[7px] bg-white border border-[#e6e8ec] rounded-[9px] px-3 py-[7px] text-[12.5px]">
@@ -128,8 +182,40 @@ const addTag = () => {
         </button>
       </div>
 
+      <!-- Pipeline (Kanban) view -->
+      <div v-if="viewMode === 'pipeline'" class="flex-1 overflow-x-auto overflow-y-hidden bg-[#f7f8fb] flex gap-3 p-4">
+        <div v-for="col in pipelineColumns" :key="col.stage" class="w-[220px] shrink-0 flex flex-col">
+          <div class="flex items-center justify-between px-1 mb-2">
+            <span class="text-[11.5px] font-bold text-[#3a3f47]">{{ col.stage }}</span>
+            <span class="font-mono text-[10.5px] text-[#9097a1] bg-white border border-[#ebedf0] rounded-full px-1.5">{{ col.items.length }}</span>
+          </div>
+          <div class="flex-1 overflow-y-auto space-y-2 pb-2">
+            <div
+              v-for="c in col.items"
+              :key="c.id"
+              @click="$emit('update:selectedCustomer', c)"
+              :class="[
+                'bg-white border rounded-[11px] p-3 cursor-pointer transition-colors',
+                selectedCustomer?.id === c.id ? 'border-[#4f46e5] ring-1 ring-[#4f46e5]/20' : 'border-[#ebedf0] hover:border-[#c7cbd1]',
+              ]"
+            >
+              <div class="flex items-center gap-2 mb-1.5">
+                <div :class="[avatarColor(c.name), 'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0']">{{ avatarInitial(c.name) }}</div>
+                <span class="text-[12px] font-medium text-[#1b1f24] truncate flex-1">{{ c.name }}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] text-[#9097a1]">{{ daysInStage(c) }}日滞留</span>
+                <span class="text-[10px] font-mono font-bold" :style="{ color: scoreColor(engagementScore(c)) }">{{ engagementScore(c) }}</span>
+              </div>
+              <div v-if="daysInStage(c) >= 3 && col.stage !== '就業'" class="mt-1.5 text-[9.5px] font-semibold text-amber-600 bg-amber-50 rounded-[5px] px-1.5 py-0.5 inline-block">⚠ 要フォロー</div>
+            </div>
+            <div v-if="col.items.length === 0" class="text-[10.5px] text-[#c2c7cf] text-center py-4">なし</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Table -->
-      <div class="flex-1 overflow-y-auto bg-white">
+      <div v-else class="flex-1 overflow-y-auto bg-white">
         <div class="sticky top-0 z-10 grid gap-3 px-[18px] py-[11px] bg-[#fafbfc] border-b border-[#ebedf0] text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.03em]" style="grid-template-columns: 1.8fr 1fr 1.2fr 1.1fr">
           <div>名前</div>
           <div>連携チャネル</div>
@@ -208,6 +294,34 @@ const addTag = () => {
             :class="segmentDot(selectedCustomer.segment).text"
           >
             <option v-for="s in allSegments" :key="s" :value="s">{{ s }}</option>
+          </select>
+        </div>
+
+        <!-- 選考ステージ・担当者・スコア -->
+        <div class="px-6 py-4 border-b border-[#f4f5f6]">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">エンゲージメントスコア</span>
+            <span class="font-mono text-[13px] font-bold" :style="{ color: scoreColor(engagementScore(selectedCustomer)) }">{{ engagementScore(selectedCustomer) }}</span>
+          </div>
+          <div class="w-full h-1.5 bg-[#f1f2f4] rounded-full overflow-hidden mb-4">
+            <div class="h-full rounded-full transition-all" :style="{ width: engagementScore(selectedCustomer) + '%', background: scoreColor(engagementScore(selectedCustomer)) }"></div>
+          </div>
+          <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1.5">選考ステージ</label>
+          <select
+            :value="selectedCustomer.pipeline_stage || '会員登録'"
+            @change="$emit('updateStage', { id: selectedCustomer.id, stage: $event.target.value })"
+            class="w-full bg-white border border-[#e6e8ec] rounded-[9px] px-2.5 py-2 text-[12.5px] font-medium mb-3 focus:outline-none focus:border-[#4f46e5]"
+          >
+            <option v-for="s in (pipelineStages || ['会員登録','面談予約','面談実施','内定','就業'])" :key="s" :value="s">{{ s }}</option>
+          </select>
+          <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1.5">担当者</label>
+          <select
+            :value="selectedCustomer.assigned_to || ''"
+            @change="$emit('assignRecruiter', { id: selectedCustomer.id, recruiterId: $event.target.value || null })"
+            class="w-full bg-white border border-[#e6e8ec] rounded-[9px] px-2.5 py-2 text-[12.5px] font-medium focus:outline-none focus:border-[#4f46e5]"
+          >
+            <option value="">未担当</option>
+            <option v-for="m in teamMembers" :key="m.id" :value="m.id">{{ m.display_name || m.id.slice(0, 8) }}</option>
           </select>
         </div>
 

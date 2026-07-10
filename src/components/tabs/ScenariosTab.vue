@@ -13,6 +13,7 @@ const props = defineProps({
   stepAiPrompt: String,
   stepAiResult: String,
   stepAiLoading: Boolean,
+  pipelineStages: Array,
 })
 const emit = defineEmits([
   'selectScenarioDef',
@@ -25,7 +26,10 @@ const emit = defineEmits([
   'toggleScenarioActive',
   'update:stepAiPrompt',
   'generateStepContent',
+  'updateScenarioTrigger',
 ])
+
+const stages = computed(() => props.pipelineStages || ['会員登録', '面談予約', '面談実施', '内定', '就業'])
 
 const channelMeta = (ch) => {
   if (ch === 'LINE') return { icon: '🟢', bg: '#e6f8ee', txt: '#06914a', dot: '#06C755' }
@@ -114,6 +118,39 @@ const createNewScenario = () => {
                 selectedScenarioDef.is_active ? 'bg-[#e6f8ee] text-[#06914a]' : 'bg-[#f1f2f4] text-[#9097a1] hover:bg-[#e6e8ec]',
               ]"
             >{{ selectedScenarioDef.is_active ? '稼働中' : '有効化' }}</button>
+          </template>
+        </div>
+        <div v-if="selectedScenarioDef" class="px-3.5 py-3 border-b border-[#ebedf0] bg-white flex flex-col gap-2">
+          <label class="text-[10px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">トリガー</label>
+          <select
+            :value="selectedScenarioDef.trigger_stage ? '滞留検知' : '友だち追加'"
+            @change="$emit('updateScenarioTrigger', { id: selectedScenarioDef.id, triggerType: $event.target.value, triggerStage: selectedScenarioDef.trigger_stage || stages[0], triggerDays: selectedScenarioDef.trigger_days || 3 })"
+            class="bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-2 text-[11.5px] focus:outline-none focus:border-[#4f46e5]"
+          >
+            <option value="友だち追加">友だち追加時</option>
+            <option value="滞留検知">滞留検知（ステージ停滞）</option>
+          </select>
+          <template v-if="selectedScenarioDef.trigger_stage">
+            <div class="flex items-center gap-1.5">
+              <select
+                :value="selectedScenarioDef.trigger_stage"
+                @change="$emit('updateScenarioTrigger', { id: selectedScenarioDef.id, triggerType: '滞留検知', triggerStage: $event.target.value, triggerDays: selectedScenarioDef.trigger_days || 3 })"
+                class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2 py-1.5 text-[11px] focus:outline-none focus:border-[#4f46e5]"
+              >
+                <option v-for="s in stages" :key="s" :value="s">{{ s }}</option>
+              </select>
+              <span class="text-[10.5px] text-[#9097a1] shrink-0">のまま</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <input
+                type="number"
+                :value="selectedScenarioDef.trigger_days"
+                @change="$emit('updateScenarioTrigger', { id: selectedScenarioDef.id, triggerType: '滞留検知', triggerStage: selectedScenarioDef.trigger_stage, triggerDays: Number($event.target.value) })"
+                class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2 py-1.5 text-[11px] font-mono text-center focus:outline-none focus:border-[#4f46e5]"
+                min="1"
+              />
+              <span class="text-[10.5px] text-[#9097a1]">日経過で自動起動</span>
+            </div>
           </template>
         </div>
         <template v-if="selectedScenarioDef">
