@@ -91,8 +91,15 @@ const crm = useCrm()
         v-else-if="crm.activeTab.value === 'tags'"
         :customers="crm.customers.value"
         :savedSegments="crm.savedSegments.value"
+        :tagGroups="crm.tagGroups.value"
+        :tagDefinitions="crm.tagDefinitions.value"
         @createSegment="crm.createSavedSegment"
         @deleteSegment="crm.deleteSavedSegment"
+        @createTagGroup="crm.createTagGroup"
+        @deleteTagGroup="crm.deleteTagGroup"
+        @createTagDefinition="crm.createTagDefinition"
+        @assignTagToGroup="crm.assignTagToGroup"
+        @deleteTagDefinition="crm.deleteTagDefinition"
       />
 
       <CustomersTab

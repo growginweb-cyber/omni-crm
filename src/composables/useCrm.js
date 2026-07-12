@@ -229,6 +229,69 @@ export function useCrm() {
     savedSegments.value = savedSegments.value.filter(s => s.id !== id)
   }
 
+  // --- タググループ（親子関係） ---
+  const tagGroups = ref([])
+  const tagDefinitions = ref([])
+
+  const fetchTagGroups = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('tag_groups')
+      .select('*')
+      .eq('tenant_id', currentTenantId.value)
+      .order('sort_order', { ascending: true })
+    tagGroups.value = data || []
+  }
+
+  const fetchTagDefinitions = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('tag_definitions')
+      .select('*')
+      .eq('tenant_id', currentTenantId.value)
+      .order('sort_order', { ascending: true })
+    tagDefinitions.value = data || []
+  }
+
+  const createTagGroup = async (name) => {
+    if (!name?.trim() || !currentTenantId.value) return
+    const { data } = await supabase.from('tag_groups').insert([{
+      tenant_id: currentTenantId.value,
+      name,
+      sort_order: tagGroups.value.length,
+    }]).select().single()
+    if (data) tagGroups.value.push(data)
+  }
+
+  const deleteTagGroup = async (id) => {
+    await supabase.from('tag_groups').delete().eq('id', id)
+    tagGroups.value = tagGroups.value.filter(g => g.id !== id)
+    tagDefinitions.value.forEach(t => { if (t.group_id === id) t.group_id = null })
+  }
+
+  const createTagDefinition = async ({ name, groupId }) => {
+    if (!name?.trim() || !currentTenantId.value) return
+    const { data, error } = await supabase.from('tag_definitions').insert([{
+      tenant_id: currentTenantId.value,
+      name,
+      group_id: groupId || null,
+      sort_order: tagDefinitions.value.filter(t => t.group_id === (groupId || null)).length,
+    }]).select().single()
+    if (data) tagDefinitions.value.push(data)
+    if (error && error.code === '23505') alert('同名のタグが既に存在します')
+  }
+
+  const assignTagToGroup = async ({ id, groupId }) => {
+    await supabase.from('tag_definitions').update({ group_id: groupId || null }).eq('id', id)
+    const t = tagDefinitions.value.find(t => t.id === id)
+    if (t) t.group_id = groupId || null
+  }
+
+  const deleteTagDefinition = async (id) => {
+    await supabase.from('tag_definitions').delete().eq('id', id)
+    tagDefinitions.value = tagDefinitions.value.filter(t => t.id !== id)
+  }
+
   // --- カレンダー ---
   const calendarEvents = ref([])
   const calendarMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
@@ -585,6 +648,8 @@ export function useCrm() {
         fetchAutoreplyRules(),
         fetchConversations(),
         fetchIntegrationConfigs(),
+        fetchTagGroups(),
+        fetchTagDefinitions(),
       ])
       await fetchScenarioDefs()
       await fetchTeamMembers()
@@ -1149,6 +1214,13 @@ export function useCrm() {
     savedSegments,
     createSavedSegment,
     deleteSavedSegment,
+    tagGroups,
+    tagDefinitions,
+    createTagGroup,
+    deleteTagGroup,
+    createTagDefinition,
+    assignTagToGroup,
+    deleteTagDefinition,
     calendarEvents,
     calendarMonth,
     createCalendarEvent,
