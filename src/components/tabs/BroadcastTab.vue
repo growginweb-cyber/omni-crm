@@ -7,10 +7,22 @@ const props = defineProps({
   broadcastTitle: String,
   scheduledAt: String,
   broadcastTargetSegment: String,
+  broadcastTargetSavedSegmentId: String,
+  savedSegments: Array,
+  customers: Array,
   broadcastTasks: Array,
   processingTaskId: String,
 })
-defineEmits(['update:selectedTemplateId', 'update:broadcastTitle', 'update:scheduledAt', 'update:broadcastTargetSegment', 'reserve', 'execute'])
+defineEmits(['update:selectedTemplateId', 'update:broadcastTitle', 'update:scheduledAt', 'update:broadcastTargetSegment', 'update:broadcastTargetSavedSegmentId', 'reserve', 'execute'])
+
+const savedSegmentAudienceCount = (seg) => {
+  if (!seg || !props.customers) return 0
+  return props.customers.filter(c => {
+    if (seg.segment_filter && c.segment !== seg.segment_filter) return false
+    if (seg.tag_filter?.length && !(c.tags || []).some(t => seg.tag_filter.includes(t))) return false
+    return true
+  }).length
+}
 
 const statusDot = (status) => {
   if (status === '完了') return { text: 'text-[#06914a]', dot: 'bg-[#06914a]', pulse: false }
@@ -79,12 +91,30 @@ const kpiCompletionRate = computed(() => {
 
         <div>
           <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-[9px] block">対象セグメント</label>
-          <select :value="broadcastTargetSegment" @change="$emit('update:broadcastTargetSegment', $event.target.value)" class="bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2.5 text-[12.5px] text-[#3a3f47] w-full focus:outline-none focus:border-[#4f46e5]">
+          <select
+            :value="broadcastTargetSegment"
+            @change="$emit('update:broadcastTargetSegment', $event.target.value); $emit('update:broadcastTargetSavedSegmentId', '')"
+            :disabled="!!broadcastTargetSavedSegmentId"
+            class="bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2.5 text-[12.5px] text-[#3a3f47] w-full focus:outline-none focus:border-[#4f46e5] disabled:opacity-40"
+          >
             <option value="ALL">すべての顧客</option>
             <option value="集客最大化タイプ">集客最大化タイプ</option>
             <option value="コスト削減タイプ">コスト削減タイプ</option>
             <option value="未診断">未診断</option>
           </select>
+        </div>
+
+        <div v-if="savedSegments?.length">
+          <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-[9px] block">保存済みセグメントを使う（任意）</label>
+          <select
+            :value="broadcastTargetSavedSegmentId"
+            @change="$emit('update:broadcastTargetSavedSegmentId', $event.target.value)"
+            class="bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2.5 text-[12.5px] text-[#3a3f47] w-full focus:outline-none focus:border-[#4f46e5]"
+          >
+            <option value="">使用しない（上の対象セグメントに従う）</option>
+            <option v-for="s in savedSegments" :key="s.id" :value="s.id">{{ s.name }}（{{ savedSegmentAudienceCount(s) }}名）</option>
+          </select>
+          <p v-if="broadcastTargetSavedSegmentId" class="text-[10.5px] text-[#4f46e5] mt-1.5">✓ タグ・セグメント条件に一致する顧客のみに配信します</p>
         </div>
 
         <div>

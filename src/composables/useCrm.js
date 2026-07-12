@@ -44,6 +44,7 @@ export function useCrm() {
   const broadcastTitle = ref('')
   const scheduledAt = ref('')
   const broadcastTargetSegment = ref('ALL')
+  const broadcastTargetSavedSegmentId = ref('')
   const isReserving = ref(false)
   const broadcastTasks = ref([])
   const processingTaskId = ref(null)
@@ -914,10 +915,20 @@ export function useCrm() {
       .from('customers')
       .select('id')
       .eq('tenant_id', currentTenantId.value)
-    const seg = broadcastTargetSegment.value !== 'ALL'
-      ? broadcastTargetSegment.value
-      : targetTemplate.target_segment
-    if (seg) customerQuery = customerQuery.eq('segment', seg)
+
+    const savedSegment = broadcastTargetSavedSegmentId.value
+      ? savedSegments.value.find((s) => s.id === broadcastTargetSavedSegmentId.value)
+      : null
+
+    if (savedSegment) {
+      if (savedSegment.segment_filter) customerQuery = customerQuery.eq('segment', savedSegment.segment_filter)
+      if (savedSegment.tag_filter?.length) customerQuery = customerQuery.overlaps('tags', savedSegment.tag_filter)
+    } else {
+      const seg = broadcastTargetSegment.value !== 'ALL'
+        ? broadcastTargetSegment.value
+        : targetTemplate.target_segment
+      if (seg) customerQuery = customerQuery.eq('segment', seg)
+    }
     const { data: targetCustomers } = await customerQuery
     if (targetCustomers?.length > 0) {
       await supabase
@@ -1095,6 +1106,7 @@ export function useCrm() {
     broadcastTitle,
     scheduledAt,
     broadcastTargetSegment,
+    broadcastTargetSavedSegmentId,
     isReserving,
     broadcastTasks,
     processingTaskId,
