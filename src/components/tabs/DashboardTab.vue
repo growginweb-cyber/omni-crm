@@ -157,6 +157,17 @@ const segmentBreakdown = computed(() => {
   return Object.entries(map).map(([name, count]) => ({ name, count, color: colors[name] || '#4f46e5' }))
 })
 
+// 選考パイプライン: 停滞している候補者（要フォロー）
+const staleCandidates = computed(() => {
+  return (props.customers || []).filter(c => {
+    if (!c.pipeline_stage || c.pipeline_stage === '就業') return false
+    const base = c.last_contacted_at || c.created_at
+    if (!base) return false
+    const days = (Date.now() - new Date(base).getTime()) / 86400000
+    return days >= 3
+  })
+})
+
 const avatarColor = (str) => {
   const colors = ['#4f46e5', '#06914a', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#db2777']
   const code = (str || '').charCodeAt(0) || 0
@@ -215,6 +226,15 @@ const channelRow = (ch) => {
           <div :class="['text-[27px] font-bold tracking-tight tabular-nums font-mono', k.valueColor]">
             {{ k.value }}<span class="text-xs text-slate-400 font-normal ml-1">{{ k.unit }}</span>
           </div>
+        </div>
+      </div>
+
+      <!-- 要フォロー候補者アラート -->
+      <div v-if="staleCandidates.length > 0" class="bg-white rounded-[16px] p-[16px] shadow-[0_1px_3px_rgba(20,24,31,.06)] border border-amber-200 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-[10px] bg-amber-50 flex items-center justify-center text-[16px] shrink-0">⚠️</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-[12.5px] font-bold text-slate-800">{{ staleCandidates.length }}名の候補者が3日以上ステージ停滞中</div>
+          <div class="text-[11px] text-[#9097a1] mt-0.5 truncate">{{ staleCandidates.slice(0, 3).map(c => c.name).join('、') }}{{ staleCandidates.length > 3 ? ' 他' : '' }} ・ 顧客管理のパイプラインビューで確認できます</div>
         </div>
       </div>
 
