@@ -1,9 +1,10 @@
-export async function sendLineMessage(supabase, { lineUid, flexJson, textContent }) {
+export async function sendLineMessage(supabase, { lineUid, flexJson, textContent, messages }) {
   const { data, error } = await supabase.functions.invoke('send-line-message', {
     body: {
       line_uid: lineUid,
       flex_json: flexJson,
       text_content: textContent,
+      messages,
     },
   })
 

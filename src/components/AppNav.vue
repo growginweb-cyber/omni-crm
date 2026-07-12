@@ -23,10 +23,10 @@ const navGroups = [
     label: '配信',
     items: [
       { id: 'broadcast', label: 'ショット配信', icon: '🚀' },
-      { id: 'scenarios', label: 'シナリオ格納庫', icon: '🗂️' },
+      { id: 'scenarios', label: 'ステップ配信', icon: '🗂️' },
       { id: 'autoreply', label: '自動応答', icon: '⚡' },
       {
-        id: 'ai-content', label: 'コンテンツ作成', icon: '✨',
+        id: 'ai-content', label: 'リテンションシナリオ', icon: '✨',
         children: [
           { channel: 'LINE', label: 'LINE', icon: '🟢' },
           { channel: 'Email', label: 'メール', icon: '📧' },

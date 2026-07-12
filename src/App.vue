@@ -171,6 +171,7 @@ const crm = useCrm()
         @update:aiTargetSegment="crm.aiTargetSegment.value = $event"
         @update:generatedContent="crm.generatedContent.value = $event"
         @update:generatedEmailHtml="crm.generatedEmailHtml.value = $event"
+        @update:generatedMessagesJson="crm.generatedMessagesJson.value = $event"
         @update:templateTitle="crm.templateTitle.value = $event"
         @generate="crm.simulateAIGeneration"
         @save="crm.saveTemplate"

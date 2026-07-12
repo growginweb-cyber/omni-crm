@@ -106,6 +106,7 @@ serve(async (req) => {
                 let flexJson = null
 
                 // 💡 2. 画面で選んだ template_id があれば、自作アセットをデータベースから引っ張る！
+                let messagesJson = null
                 if (q.template_id) {
                     const { data: template } = await supabase
                         .from('broadcast_templates')
@@ -116,6 +117,7 @@ serve(async (req) => {
                     if (template) {
                         textContent = template.content
                         flexJson = template.flex_json
+                        messagesJson = template.messages_json
                     }
                 }
 
@@ -139,9 +141,11 @@ serve(async (req) => {
                 if (channel === 'LINE' && customer.line_uid && customer.line_uid !== '未連携') {
                     console.log(`-> LINEに送信中: ${customer.line_uid}`)
 
-                    const messagePayload = flexJson
-                        ? { type: "flex", altText: "AI Omni CRMからのメッセージ", contents: flexJson }
-                        : { type: 'text', text: textContent }
+                    const messagePayloads = Array.isArray(messagesJson) && messagesJson.length > 0
+                        ? messagesJson.slice(0, 5)
+                        : flexJson
+                            ? [{ type: "flex", altText: "AI Omni CRMからのメッセージ", contents: flexJson }]
+                            : [{ type: 'text', text: textContent }]
 
                     try {
                         const res = await fetch('https://api.line.me/v2/bot/message/push', {
@@ -152,7 +156,7 @@ serve(async (req) => {
                             },
                             body: JSON.stringify({
                                 to: customer.line_uid,
-                                messages: [messagePayload]
+                                messages: messagePayloads
                             })
                         })
 

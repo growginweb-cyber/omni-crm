@@ -73,8 +73,8 @@ const createNewScenario = () => {
   <div class="flex-1 flex flex-col min-h-0">
     <header class="flex items-center justify-between px-5 py-3.5 border-b border-[#ebedf0] bg-white">
       <div>
-        <h1 class="text-base font-semibold">シナリオ格納庫</h1>
-        <p class="text-[11px] text-[#9097a1] mt-0.5">シナリオを作成・編集してください。配信は診断完了時のトリガーで自動実行されます</p>
+        <h1 class="text-base font-semibold">ステップ配信</h1>
+        <p class="text-[11px] text-[#9097a1] mt-0.5">シナリオを作成し、各ステップに「リテンションシナリオ」を割り当てて自動配信します</p>
       </div>
     </header>
 
@@ -228,15 +228,45 @@ const createNewScenario = () => {
               </div>
 
               <div>
-                <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1.5">配信コンテンツ</label>
-                <select
-                  :value="selectedScenarioItem.template_id || ''"
-                  @change="$emit('updateScenarioItem', { id: selectedScenarioItem.id, templateId: $event.target.value })"
-                  class="bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2.5 text-[12.5px] w-full focus:outline-none focus:border-[#4f46e5]"
-                >
-                  <option value="">未選択（標準テキスト）</option>
-                  <option v-for="t in filteredTemplates" :key="t.id" :value="t.id">{{ t.title }}</option>
-                </select>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">配信コンテンツ（リテンションシナリオ）</label>
+                  <span class="text-[9.5px] font-semibold px-2 py-[2px] rounded-[5px]" :style="{ background: channelMeta(selectedScenarioItem.delivery_channel).bg, color: channelMeta(selectedScenarioItem.delivery_channel).txt }">{{ selectedScenarioItem.delivery_channel }}用のみ表示</span>
+                </div>
+
+                <div v-if="filteredTemplates.length === 0" class="text-center py-6 bg-[#f7f8fa] rounded-[10px] border border-dashed border-[#ebedf0]">
+                  <p class="text-[11px] text-[#9097a1]">この配信チャネル用のリテンションシナリオがまだありません</p>
+                  <p class="text-[10px] text-[#c2c7cf] mt-1">左メニューの「リテンションシナリオ」から作成してください</p>
+                </div>
+                <div v-else class="space-y-1.5 max-h-[280px] overflow-y-auto pr-0.5">
+                  <button
+                    @click="$emit('updateScenarioItem', { id: selectedScenarioItem.id, templateId: '' })"
+                    :class="[
+                      'w-full text-left px-3 py-2.5 rounded-[9px] border transition-colors',
+                      !selectedScenarioItem.template_id ? 'border-[#4f46e5] bg-[#ececfd]' : 'border-[#ebedf0] bg-white hover:bg-[#f7f8fa]',
+                    ]"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[12px] font-semibold text-slate-700">未選択（標準テキスト）</span>
+                      <span v-if="!selectedScenarioItem.template_id" class="text-[#4f46e5] text-xs shrink-0">✓</span>
+                    </div>
+                    <div class="text-[10px] text-[#9097a1] mt-0.5">自動生成された定型文を送信します</div>
+                  </button>
+                  <button
+                    v-for="t in filteredTemplates"
+                    :key="t.id"
+                    @click="$emit('updateScenarioItem', { id: selectedScenarioItem.id, templateId: t.id })"
+                    :class="[
+                      'w-full text-left px-3 py-2.5 rounded-[9px] border transition-colors',
+                      selectedScenarioItem.template_id === t.id ? 'border-[#4f46e5] bg-[#ececfd]' : 'border-[#ebedf0] bg-white hover:bg-[#f7f8fa]',
+                    ]"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[12px] font-semibold text-slate-800 truncate">{{ t.title || '無題のシナリオ' }}</span>
+                      <span v-if="selectedScenarioItem.template_id === t.id" class="text-[#4f46e5] text-xs shrink-0">✓</span>
+                    </div>
+                    <div class="text-[10px] text-[#9097a1] mt-0.5 truncate">{{ t.content || '内容未設定' }}</div>
+                  </button>
+                </div>
               </div>
             </div>
 

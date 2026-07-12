@@ -11,23 +11,26 @@ serve(async (req) => {
   }
 
   try {
-    const { line_uid, flex_json, text_content } = await req.json()
-    
+    const { line_uid, flex_json, text_content, messages } = await req.json()
+
     // 💡 [デバッグ用ログ] フロントから届いたUIDを表示
     console.log(`[送信要求を受け付けました] 対象UID: ${line_uid}`)
 
-    // 構造エラーを防ぐため、Flexメッセージの組み立てを厳格化
-    let messagePayload;
-    if (flex_json && Object.keys(flex_json).length > 0) {
+    // 複数メッセージ（リテンションシナリオ）が渡された場合はそのまま利用
+    let messagePayloads;
+    if (Array.isArray(messages) && messages.length > 0) {
+      messagePayloads = messages.slice(0, 5)
+      console.log(`[ログ] 複数メッセージ形式で送信します（${messagePayloads.length}件）`)
+    } else if (flex_json && Object.keys(flex_json).length > 0) {
       // Flex Messageの最外殻（type: "flex"）を自動補完する安心設計
-      messagePayload = {
+      messagePayloads = [{
         type: "flex",
         altText: "AI Omni CRMからのフィードバックです",
         contents: flex_json
-      }
+      }]
       console.log("[ログ] Flex Message形式で送信します")
     } else {
-      messagePayload = { type: 'text', text: text_content || "メッセージが空です" }
+      messagePayloads = [{ type: 'text', text: text_content || "メッセージが空です" }]
       console.log("[ログ] 通常テキスト形式で送信します")
     }
 
@@ -46,7 +49,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         to: line_uid,
-        messages: [messagePayload]
+        messages: messagePayloads
       })
     })
 

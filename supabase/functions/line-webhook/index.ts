@@ -317,17 +317,19 @@ async function executeNode(
     if (templateId) {
       const { data: tmpl } = await supabase
         .from('broadcast_templates')
-        .select('flex_json, content')
+        .select('flex_json, content, messages_json')
         .eq('id', templateId)
         .maybeSingle()
       if (tmpl) {
-        const msg = tmpl.flex_json
-          ? { type: 'flex', altText: tmpl.content || 'オファー', contents: tmpl.flex_json }
-          : { type: 'text', text: tmpl.content || '' }
+        const msgs = Array.isArray(tmpl.messages_json) && tmpl.messages_json.length > 0
+          ? tmpl.messages_json.slice(0, 5)
+          : tmpl.flex_json
+            ? [{ type: 'flex', altText: tmpl.content || 'オファー', contents: tmpl.flex_json }]
+            : [{ type: 'text', text: tmpl.content || '' }]
         await fetch('https://api.line.me/v2/bot/message/push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ to: lineUid, messages: [msg] }),
+          body: JSON.stringify({ to: lineUid, messages: msgs }),
         })
       }
     }

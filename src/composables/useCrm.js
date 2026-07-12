@@ -35,6 +35,7 @@ export function useCrm() {
   const generatedImageUrl = ref('')
   const generatedFlexJson = ref(null)
   const generatedEmailHtml = ref('')
+  const generatedMessagesJson = ref(null)
   const emailSubject = ref('')
   const templateTitle = ref('')
   const savedTemplates = ref([])
@@ -871,6 +872,7 @@ export function useCrm() {
         html_content: generatedEmailHtml.value || null,
         image_url: generatedImageUrl.value || null,
         flex_json: generatedFlexJson.value || null,
+        messages_json: generatedMessagesJson.value || null,
         email_subject: emailSubject.value || null,
         delivery_channel: selectedChannel.value,
         target_segment: aiTargetSegment.value,
@@ -881,6 +883,7 @@ export function useCrm() {
     generatedContent.value = ''
     generatedImageUrl.value = ''
     generatedFlexJson.value = null
+    generatedMessagesJson.value = null
     generatedEmailHtml.value = ''
     emailSubject.value = ''
   }
@@ -977,6 +980,7 @@ export function useCrm() {
                 lineUid: q.customers.line_uid,
                 flexJson: template.flex_json,
                 textContent: trackedContent,
+                messages: template.messages_json?.length ? template.messages_json : undefined,
               })
             } else {
               await simulateChannelDelivery(channel)
@@ -1082,6 +1086,7 @@ export function useCrm() {
     isGenerating,
     generatedContent,
     generatedImageUrl,
+    generatedMessagesJson,
     generatedEmailHtml,
     aiPurpose,
     templateTitle,

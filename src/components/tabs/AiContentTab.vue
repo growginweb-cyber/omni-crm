@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { buildLineMessages, summarizeLineBlocks } from '../../lib/lineMessage'
 
 const props = defineProps({
   selectedChannel: String,
@@ -10,7 +11,7 @@ const props = defineProps({
   templateTitle: String,
   savedTemplates: Array,
 })
-const emit = defineEmits(['update:selectedChannel', 'update:aiTargetSegment', 'update:generatedContent', 'update:generatedEmailHtml', 'update:templateTitle', 'generate', 'save', 'deleteTemplate'])
+const emit = defineEmits(['update:selectedChannel', 'update:aiTargetSegment', 'update:generatedContent', 'update:generatedEmailHtml', 'update:generatedMessagesJson', 'update:templateTitle', 'generate', 'save', 'deleteTemplate'])
 
 const channels = [
   { id: 'LINE', label: 'LINE', icon: '🟢', color: 'emerald' },
@@ -18,69 +19,67 @@ const channels = [
   { id: 'SMS', label: 'SMS', icon: '💬', color: 'violet' },
 ]
 
-const lineBlocks = ref([])
-const dragIndex = ref(null)
+// ==================== LINE: 複数メッセージ種別を1つのシナリオにまとめる ====================
+const lineScenarioBlocks = ref([])
+const activeBlockId = ref(null)
 
-const blockTypes = [
-  { type: 'text', label: 'テキスト', icon: '📝' },
-  { type: 'image', label: '画像', icon: '🖼' },
-  { type: 'button', label: 'ボタン', icon: '🔘' },
-]
+const blockKindMeta = {
+  text: { label: 'テキスト/画像/ボタン', icon: '📝' },
+  flex: { label: 'フレックス', icon: '🎴' },
+  carousel: { label: 'カルーセル', icon: '🎠' },
+  imagemap: { label: 'イメージマップ', icon: '🗺' },
+}
 
-const addBlock = (type) => {
-  const block = { id: Date.now(), type }
-  if (type === 'text') block.text = ''
-  if (type === 'image') block.url = ''
-  if (type === 'button') { block.label = ''; block.url = '' }
-  lineBlocks.value.push(block)
+const defaultBlockData = (kind) => {
+  if (kind === 'text') return { subBlocks: [] }
+  if (kind === 'flex') return { heroImage: '', title: '', subtitle: '', bodyTexts: [''], footerButtons: [{ label: '', url: '' }] }
+  if (kind === 'carousel') return { cards: [{ imageUrl: '', title: '', text: '', buttons: [{ label: '', url: '' }] }] }
+  if (kind === 'imagemap') return { baseUrl: '', baseWidth: 1040, baseHeight: 1040, actions: [{ x: 0, y: 0, width: 520, height: 520, type: 'uri', value: '', label: '' }] }
+  return {}
+}
+
+const addScenarioBlock = (kind) => {
+  const block = { id: Date.now() + Math.random(), kind, ...defaultBlockData(kind) }
+  lineScenarioBlocks.value.push(block)
+  activeBlockId.value = block.id
   syncContent()
 }
 
-const removeBlock = (index) => {
-  lineBlocks.value.splice(index, 1)
+const removeScenarioBlock = (index) => {
+  lineScenarioBlocks.value.splice(index, 1)
   syncContent()
 }
 
-const moveBlock = (from, to) => {
-  if (to < 0 || to >= lineBlocks.value.length) return
-  const item = lineBlocks.value.splice(from, 1)[0]
-  lineBlocks.value.splice(to, 0, item)
+const moveScenarioBlock = (from, to) => {
+  if (to < 0 || to >= lineScenarioBlocks.value.length) return
+  const item = lineScenarioBlocks.value.splice(from, 1)[0]
+  lineScenarioBlocks.value.splice(to, 0, item)
   syncContent()
 }
 
-const lineMessageType = ref('text')
-const lineMessageTypes = [
-  { id: 'text', label: 'テキスト', icon: '📝' },
-  { id: 'flex', label: 'フレックス', icon: '🎴' },
-  { id: 'carousel', label: 'カルーセル', icon: '🎠' },
-  { id: 'imagemap', label: 'イメージマップ', icon: '🗺' },
-]
-const flexData = ref({ heroImage: '', title: '', subtitle: '', bodyTexts: [''], footerButtons: [{ label: '', url: '' }] })
-const carouselCards = ref([{ imageUrl: '', title: '', text: '', buttons: [{ label: '', url: '' }] }])
-const imageMapData = ref({ baseUrl: '', baseWidth: 1040, baseHeight: 1040, actions: [{ x: 0, y: 0, width: 520, height: 520, type: 'uri', value: '', label: '' }] })
+const toggleActiveBlock = (id) => {
+  activeBlockId.value = activeBlockId.value === id ? null : id
+}
 
-const addCarouselCard = () => { if (carouselCards.value.length < 10) carouselCards.value.push({ imageUrl: '', title: '', text: '', buttons: [{ label: '', url: '' }] }) }
-const removeCarouselCard = (i) => { carouselCards.value.splice(i, 1) }
-const addImageMapAction = () => { imageMapData.value.actions.push({ x: 0, y: 0, width: 520, height: 520, type: 'uri', value: '', label: '' }) }
-const removeImageMapAction = (i) => { imageMapData.value.actions.splice(i, 1) }
+// テキスト種別ブロック内のサブブロック（テキスト/画像/ボタン）操作
+const addSubBlock = (block, type) => {
+  const sub = { id: Date.now() + Math.random(), type }
+  if (type === 'text') sub.text = ''
+  if (type === 'image') sub.url = ''
+  if (type === 'button') { sub.label = ''; sub.url = '' }
+  block.subBlocks.push(sub)
+  syncContent()
+}
+const removeSubBlock = (block, index) => { block.subBlocks.splice(index, 1); syncContent() }
+
+const addCarouselCard = (block) => { if (block.cards.length < 10) block.cards.push({ imageUrl: '', title: '', text: '', buttons: [{ label: '', url: '' }] }) }
+const removeCarouselCard = (block, i) => { block.cards.splice(i, 1) }
+const addImageMapAction = (block) => { block.actions.push({ x: 0, y: 0, width: 520, height: 520, type: 'uri', value: '', label: '' }) }
+const removeImageMapAction = (block, i) => { block.actions.splice(i, 1) }
 
 const syncContent = () => {
-  let content = ''
-  if (lineMessageType.value === 'text') {
-    content = lineBlocks.value.map(b => {
-      if (b.type === 'text') return b.text
-      if (b.type === 'image') return `[画像: ${b.url || '未設定'}]`
-      if (b.type === 'button') return `[ボタン: ${b.label || '未設定'} → ${b.url || '#'}]`
-      return ''
-    }).join('\n---\n')
-  } else if (lineMessageType.value === 'flex') {
-    content = `[Flex] ${flexData.value.title || '無題'}`
-  } else if (lineMessageType.value === 'carousel') {
-    content = `[カルーセル] ${carouselCards.value.length}枚`
-  } else if (lineMessageType.value === 'imagemap') {
-    content = `[イメージマップ] ${imageMapData.value.actions.length}エリア`
-  }
-  emit('update:generatedContent', content)
+  emit('update:generatedContent', summarizeLineBlocks(lineScenarioBlocks.value))
+  emit('update:generatedMessagesJson', buildLineMessages(lineScenarioBlocks.value))
 }
 
 const smsText = ref('')
@@ -251,14 +250,9 @@ const sendLineTest = async () => {
   isSendingTest.value = true
   testSendResult.value = ''
   try {
-    const textMsg = lineBlocks.value.map(b => {
-      if (b.type === 'text') return b.text
-      if (b.type === 'image') return `[画像: ${b.url || '未設定'}]`
-      if (b.type === 'button') return `[ボタン: ${b.label}]`
-      return ''
-    }).join('\n')
-    const { data, error } = await supabase.functions.invoke('send-line-message', {
-      body: { line_uid: uid, text_content: textMsg || 'テスト送信' }
+    const messages = buildLineMessages(lineScenarioBlocks.value)
+    const { error } = await supabase.functions.invoke('send-line-message', {
+      body: { line_uid: uid, messages: messages.length ? messages : undefined, text_content: messages.length ? undefined : 'テスト送信' }
     })
     testSendResult.value = error ? `❌ ${error.message}` : '✅ 送信しました'
   } catch (e) {
@@ -268,13 +262,19 @@ const sendLineTest = async () => {
     setTimeout(() => { testSendResult.value = '' }, 4000)
   }
 }
+
+const saveScenario = () => {
+  emit('save')
+  lineScenarioBlocks.value = []
+  activeBlockId.value = null
+}
 </script>
 
 <template>
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Channel tabs -->
     <div class="px-5 py-3 bg-white border-b border-[#ebedf0] flex items-center gap-4 shrink-0">
-      <h2 class="text-lg font-bold text-slate-900 mr-2">コンテンツ作成</h2>
+      <h2 class="text-lg font-bold text-slate-900 mr-2">リテンションシナリオ</h2>
       <div class="flex bg-slate-100 p-0.5 rounded-lg">
         <button
           v-for="ch in channels"
@@ -298,157 +298,144 @@ const sendLineTest = async () => {
         <div class="flex-1 min-w-0 flex flex-col border-r border-[#ebedf0] bg-white overflow-hidden">
           <!-- Header -->
           <div class="px-5 py-3 border-b border-[#ebedf0] shrink-0">
-            <h3 class="text-[12px] font-semibold text-[#6b7280] mb-2">LINE メッセージビルダー</h3>
-            <input :value="templateTitle" @input="$emit('update:templateTitle', $event.target.value)" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition" placeholder="テンプレート名（例: 初回クーポン配信）" />
+            <h3 class="text-[12px] font-semibold text-[#6b7280] mb-2">リテンションシナリオ（LINE）</h3>
+            <input :value="templateTitle" @input="$emit('update:templateTitle', $event.target.value)" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition" placeholder="シナリオ名（例: 初回クーポン配信）" />
+            <p class="text-[10px] text-slate-400 mt-1.5">テキスト・フレックス・カルーセル・イメージマップを自由に組み合わせて、1つのシナリオとして送信できます</p>
           </div>
 
-          <!-- Message type selector -->
+          <!-- Add block toolbar -->
           <div class="px-5 py-2 bg-[#f7f8fa] border-b border-[#ebedf0] flex gap-1.5 shrink-0">
-            <button v-for="mt in lineMessageTypes" :key="mt.id" @click="lineMessageType = mt.id" :class="['px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1.5', lineMessageType === mt.id ? 'bg-[#4f46e5] text-white shadow-sm' : 'text-[#3a3f47] bg-white border border-[#e6e8ec] hover:bg-[#f1f2f4]']">
-              <span>{{ mt.icon }}</span> {{ mt.label }}
+            <button v-for="(meta, kind) in blockKindMeta" :key="kind" @click="addScenarioBlock(kind)" class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-[#3a3f47] bg-white border border-[#e6e8ec] rounded-[8px] hover:bg-[#f1f2f4] transition-colors">
+              <span>{{ meta.icon }}</span> ＋{{ meta.label }}
             </button>
           </div>
 
-          <!-- Editor area -->
+          <!-- Block list -->
           <div class="flex-1 overflow-y-auto p-5">
-            <!-- ===== Text blocks ===== -->
-            <template v-if="lineMessageType === 'text'">
-              <div class="flex gap-2 mb-4">
-                <button v-for="bt in blockTypes" :key="bt.type" @click="addBlock(bt.type)" class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-[#3a3f47] bg-white border border-[#e6e8ec] rounded-[8px] hover:bg-[#f1f2f4] transition-colors">
-                  <span>{{ bt.icon }}</span> {{ bt.label }}
+            <div v-if="lineScenarioBlocks.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
+              <div class="text-3xl mb-2">🗂️</div>
+              <p class="text-xs text-slate-400">上のボタンからメッセージを追加してシナリオを組み立てましょう</p>
+              <p class="text-[10px] text-slate-300 mt-1">複数追加すると、その順番でまとめて配信されます</p>
+            </div>
+
+            <div class="space-y-3">
+              <div
+                v-for="(block, i) in lineScenarioBlocks"
+                :key="block.id"
+                class="bg-white border border-[#ebedf0] rounded-[13px] overflow-hidden group"
+                :class="activeBlockId === block.id ? 'ring-2 ring-emerald-400' : ''"
+              >
+                <!-- Block header -->
+                <button @click="toggleActiveBlock(block.id)" class="w-full flex items-center justify-between px-4 py-3 bg-[#fafbfc] hover:bg-[#f4f5f6] transition-colors">
+                  <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center justify-center">{{ i + 1 }}</span>
+                    <span class="text-[11px] font-bold text-slate-700">{{ blockKindMeta[block.kind].icon }} {{ blockKindMeta[block.kind].label }}</span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span @click.stop="moveScenarioBlock(i, i - 1)" :class="['w-5 h-5 rounded text-[10px] flex items-center justify-center', i === 0 ? 'text-slate-200' : 'bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer']">↑</span>
+                    <span @click.stop="moveScenarioBlock(i, i + 1)" :class="['w-5 h-5 rounded text-[10px] flex items-center justify-center', i === lineScenarioBlocks.length - 1 ? 'text-slate-200' : 'bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer']">↓</span>
+                    <span @click.stop="removeScenarioBlock(i)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center cursor-pointer">×</span>
+                    <span class="text-[9px] text-slate-300 ml-1">{{ activeBlockId === block.id ? '▲' : '▼' }}</span>
+                  </div>
                 </button>
-              </div>
-              <div v-if="lineBlocks.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
-                <div class="text-3xl mb-2">📝</div>
-                <p class="text-xs text-slate-400">ブロックを追加してメッセージを作成</p>
-              </div>
-              <div class="space-y-3">
-                <div v-for="(block, i) in lineBlocks" :key="block.id" class="bg-white border border-[#ebedf0] rounded-[13px] p-4 group relative" :class="dragIndex === i ? 'ring-2 ring-emerald-400' : ''">
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">{{ block.type === 'text' ? '📝 テキスト' : block.type === 'image' ? '🖼️ 画像' : '🔘 ボタン' }}</span>
-                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button @click="moveBlock(i, i - 1)" :disabled="i === 0" class="w-5 h-5 rounded text-[10px] bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center">↑</button>
-                      <button @click="moveBlock(i, i + 1)" :disabled="i === lineBlocks.length - 1" class="w-5 h-5 rounded text-[10px] bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center">↓</button>
-                      <button @click="removeBlock(i)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center">×</button>
+
+                <div v-if="activeBlockId === block.id" class="p-4 border-t border-[#ebedf0]">
+                  <!-- ===== text kind ===== -->
+                  <template v-if="block.kind === 'text'">
+                    <div class="flex gap-2 mb-3">
+                      <button v-for="bt in [{type:'text',label:'テキスト',icon:'📝'},{type:'image',label:'画像',icon:'🖼'},{type:'button',label:'ボタン',icon:'🔘'}]" :key="bt.type" @click="addSubBlock(block, bt.type)" class="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-[#3a3f47] bg-white border border-[#e6e8ec] rounded-[7px] hover:bg-[#f1f2f4] transition-colors">
+                        <span>{{ bt.icon }}</span> {{ bt.label }}
+                      </button>
                     </div>
-                  </div>
-                  <textarea v-if="block.type === 'text'" v-model="block.text" @input="syncContent" rows="3" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition resize-none" placeholder="メッセージテキストを入力..."></textarea>
-                  <div v-if="block.type === 'image'">
-                    <input v-model="block.url" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（https://...）" />
-                    <div v-if="block.url" class="mt-2 rounded-lg overflow-hidden border border-[#ebedf0] bg-[#f7f8fa]"><img :src="block.url" class="w-full max-h-40 object-cover" @error="$event.target.style.display='none'" /></div>
-                  </div>
-                  <div v-if="block.type === 'button'" class="space-y-2">
-                    <input v-model="block.label" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ボタンラベル（例: 詳しく見る）" />
-                    <input v-model="block.url" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="リンクURL（https://...）" />
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <!-- ===== Flex message ===== -->
-            <template v-else-if="lineMessageType === 'flex'">
-              <div class="space-y-4">
-                <div>
-                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">ヒーロー画像</label>
-                  <input v-model="flexData.heroImage" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（https://...）" />
-                  <div v-if="flexData.heroImage" class="mt-2 rounded-lg overflow-hidden border border-[#ebedf0] bg-[#f7f8fa]"><img :src="flexData.heroImage" class="w-full max-h-32 object-cover" @error="$event.target.style.display='none'" /></div>
-                </div>
-                <div>
-                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">タイトル</label>
-                  <input v-model="flexData.title" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトルテキスト" />
-                </div>
-                <div>
-                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">サブタイトル</label>
-                  <input v-model="flexData.subtitle" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="サブタイトル（任意）" />
-                </div>
-                <div>
-                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">本文</label>
-                  <div v-for="(_, ti) in flexData.bodyTexts" :key="ti" class="flex gap-2 mb-2">
-                    <textarea v-model="flexData.bodyTexts[ti]" rows="2" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="本文テキスト"></textarea>
-                    <button v-if="flexData.bodyTexts.length > 1" @click="flexData.bodyTexts.splice(ti, 1)" class="text-red-400 hover:text-red-600 text-xs self-start mt-1">×</button>
-                  </div>
-                  <button @click="flexData.bodyTexts.push('')" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ テキスト追加</button>
-                </div>
-                <div>
-                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">フッターボタン</label>
-                  <div v-for="(btn, bi) in flexData.footerButtons" :key="bi" class="flex gap-2 mb-2">
-                    <input v-model="btn.label" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ラベル" />
-                    <input v-model="btn.url" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="URL" />
-                    <button v-if="flexData.footerButtons.length > 1" @click="flexData.footerButtons.splice(bi, 1)" class="text-red-400 hover:text-red-600 text-xs">×</button>
-                  </div>
-                  <button @click="flexData.footerButtons.push({ label: '', url: '' })" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ ボタン追加</button>
-                </div>
-              </div>
-            </template>
-
-            <!-- ===== Carousel ===== -->
-            <template v-else-if="lineMessageType === 'carousel'">
-              <div class="space-y-4">
-                <div v-for="(card, ci) in carouselCards" :key="ci" class="border border-[#ebedf0] rounded-[13px] p-4 group relative">
-                  <div class="flex items-center justify-between mb-3">
-                    <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">カード {{ ci + 1 }} / {{ carouselCards.length }}</span>
-                    <button v-if="carouselCards.length > 1" @click="removeCarouselCard(ci)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
-                  </div>
-                  <div class="space-y-2">
-                    <input v-model="card.imageUrl" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL" />
-                    <div v-if="card.imageUrl" class="rounded-lg overflow-hidden border border-[#ebedf0] bg-[#f7f8fa] max-h-24"><img :src="card.imageUrl" class="w-full object-cover" @error="$event.target.style.display='none'" /></div>
-                    <input v-model="card.title" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトル（最大40文字）" maxlength="40" />
-                    <textarea v-model="card.text" rows="2" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="説明テキスト（最大60文字）" maxlength="60"></textarea>
-                    <div class="pt-1">
-                      <label class="text-[10px] font-bold text-slate-400 block mb-1">アクションボタン</label>
-                      <div v-for="(btn, bi) in card.buttons" :key="bi" class="flex gap-2 mb-1.5">
-                        <input v-model="btn.label" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="ラベル" />
-                        <input v-model="btn.url" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="URL" />
-                        <button v-if="card.buttons.length > 1" @click="card.buttons.splice(bi, 1)" class="text-red-400 text-xs">×</button>
+                    <div v-if="block.subBlocks.length === 0" class="text-center py-6 text-[11px] text-slate-300">テキスト・画像・ボタンを追加してください</div>
+                    <div class="space-y-2.5">
+                      <div v-for="(sub, si) in block.subBlocks" :key="sub.id" class="bg-[#f7f8fa] border border-[#ebedf0] rounded-[10px] p-3 relative group/sub">
+                        <button @click="removeSubBlock(block, si)" class="absolute top-2 right-2 w-5 h-5 rounded text-[10px] bg-white text-red-400 hover:text-red-600 flex items-center justify-center opacity-0 group-hover/sub:opacity-100 transition-opacity">×</button>
+                        <textarea v-if="sub.type === 'text'" v-model="sub.text" @input="syncContent" rows="2" class="w-full bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition resize-none" placeholder="メッセージテキスト"></textarea>
+                        <input v-if="sub.type === 'image'" v-model="sub.url" @input="syncContent" class="w-full bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（https://...）" />
+                        <div v-if="sub.type === 'button'" class="flex gap-2">
+                          <input v-model="sub.label" @input="syncContent" class="flex-1 bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ボタンラベル" />
+                          <input v-model="sub.url" @input="syncContent" class="flex-1 bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="リンクURL" />
+                        </div>
                       </div>
-                      <button v-if="card.buttons.length < 3" @click="card.buttons.push({ label: '', url: '' })" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ ボタン</button>
                     </div>
-                  </div>
-                </div>
-                <button @click="addCarouselCard" :disabled="carouselCards.length >= 10" class="w-full py-2.5 border-2 border-dashed border-[#ebedf0] rounded-[13px] text-[11px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors disabled:opacity-40">+ カード追加（最大10枚）</button>
-              </div>
-            </template>
+                  </template>
 
-            <!-- ===== ImageMap ===== -->
-            <template v-else-if="lineMessageType === 'imagemap'">
-              <div class="space-y-4">
-                <div>
-                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">ベース画像</label>
-                  <input v-model="imageMapData.baseUrl" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（幅1040px推奨）" />
-                  <div v-if="imageMapData.baseUrl" class="mt-2 relative rounded-lg overflow-hidden border border-[#ebedf0] bg-[#f7f8fa]">
-                    <img :src="imageMapData.baseUrl" class="w-full" @error="$event.target.style.display='none'" />
-                    <div v-for="(action, ai) in imageMapData.actions" :key="ai" class="absolute border-2 border-emerald-400/70 bg-emerald-400/15 flex items-center justify-center cursor-pointer" :style="{ left: (action.x / imageMapData.baseWidth * 100) + '%', top: (action.y / imageMapData.baseHeight * 100) + '%', width: (action.width / imageMapData.baseWidth * 100) + '%', height: (action.height / imageMapData.baseHeight * 100) + '%' }">
-                      <span class="text-[8px] bg-emerald-600 text-white px-1.5 py-0.5 rounded font-bold shadow">{{ ai + 1 }}</span>
+                  <!-- ===== flex kind ===== -->
+                  <template v-else-if="block.kind === 'flex'">
+                    <div class="space-y-3">
+                      <input v-model="block.heroImage" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ヒーロー画像URL（任意）" />
+                      <input v-model="block.title" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトル" />
+                      <input v-model="block.subtitle" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="サブタイトル（任意）" />
+                      <div v-for="(_, ti) in block.bodyTexts" :key="ti" class="flex gap-2">
+                        <textarea v-model="block.bodyTexts[ti]" @input="syncContent" rows="2" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="本文テキスト"></textarea>
+                        <button v-if="block.bodyTexts.length > 1" @click="block.bodyTexts.splice(ti, 1); syncContent()" class="text-red-400 hover:text-red-600 text-xs self-start mt-1">×</button>
+                      </div>
+                      <button @click="block.bodyTexts.push(''); syncContent()" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ 本文を追加</button>
+                      <div>
+                        <label class="text-[10px] font-bold text-slate-400 block mb-1">フッターボタン</label>
+                        <div v-for="(btn, bi) in block.footerButtons" :key="bi" class="flex gap-2 mb-1.5">
+                          <input v-model="btn.label" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ラベル" />
+                          <input v-model="btn.url" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="URL" />
+                          <button v-if="block.footerButtons.length > 1" @click="block.footerButtons.splice(bi, 1); syncContent()" class="text-red-400 hover:text-red-600 text-xs">×</button>
+                        </div>
+                        <button @click="block.footerButtons.push({ label: '', url: '' }); syncContent()" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ ボタン追加</button>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <div class="flex gap-3">
-                  <label class="flex items-center gap-1.5 text-[10px] text-slate-500">幅 <input type="number" v-model.number="imageMapData.baseWidth" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
-                  <label class="flex items-center gap-1.5 text-[10px] text-slate-500">高さ <input type="number" v-model.number="imageMapData.baseHeight" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
-                </div>
-                <div>
-                  <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-2">タップエリア</label>
-                  <div v-for="(action, ai) in imageMapData.actions" :key="ai" class="border border-[#ebedf0] rounded-[13px] p-3 mb-3 space-y-2">
-                    <div class="flex items-center justify-between">
-                      <span class="text-[10px] font-bold text-slate-500 flex items-center gap-1"><span class="w-4 h-4 bg-emerald-600 text-white rounded text-[8px] flex items-center justify-center font-bold">{{ ai + 1 }}</span> エリア</span>
-                      <button v-if="imageMapData.actions.length > 1" @click="removeImageMapAction(ai)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center">×</button>
+                  </template>
+
+                  <!-- ===== carousel kind ===== -->
+                  <template v-else-if="block.kind === 'carousel'">
+                    <div class="space-y-3">
+                      <div v-for="(card, ci) in block.cards" :key="ci" class="border border-[#ebedf0] rounded-[10px] p-3 group/card relative">
+                        <div class="flex items-center justify-between mb-2">
+                          <span class="text-[10px] font-semibold text-[#9097a1]">カード {{ ci + 1 }} / {{ block.cards.length }}</span>
+                          <button v-if="block.cards.length > 1" @click="removeCarouselCard(block, ci)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity">×</button>
+                        </div>
+                        <div class="space-y-1.5">
+                          <input v-model="card.imageUrl" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL" />
+                          <input v-model="card.title" @input="syncContent" maxlength="40" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトル（最大40文字）" />
+                          <textarea v-model="card.text" @input="syncContent" rows="2" maxlength="60" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="説明テキスト（最大60文字）"></textarea>
+                          <div v-for="(btn, bi) in card.buttons" :key="bi" class="flex gap-1.5">
+                            <input v-model="btn.label" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="ラベル" />
+                            <input v-model="btn.url" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="URL" />
+                          </div>
+                        </div>
+                      </div>
+                      <button @click="addCarouselCard(block)" :disabled="block.cards.length >= 10" class="w-full py-2 border-2 border-dashed border-[#ebedf0] rounded-[10px] text-[10px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors disabled:opacity-40">+ カード追加（最大10枚）</button>
                     </div>
-                    <div class="grid grid-cols-4 gap-2">
-                      <label class="text-[10px] text-slate-500">X <input type="number" v-model.number="action.x" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] mt-0.5" /></label>
-                      <label class="text-[10px] text-slate-500">Y <input type="number" v-model.number="action.y" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] mt-0.5" /></label>
-                      <label class="text-[10px] text-slate-500">幅 <input type="number" v-model.number="action.width" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] mt-0.5" /></label>
-                      <label class="text-[10px] text-slate-500">高さ <input type="number" v-model.number="action.height" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] mt-0.5" /></label>
+                  </template>
+
+                  <!-- ===== imagemap kind ===== -->
+                  <template v-else-if="block.kind === 'imagemap'">
+                    <div class="space-y-3">
+                      <input v-model="block.baseUrl" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ベース画像URL（幅1040px推奨）" />
+                      <div class="flex gap-3">
+                        <label class="flex items-center gap-1.5 text-[10px] text-slate-500">幅 <input type="number" v-model.number="block.baseWidth" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
+                        <label class="flex items-center gap-1.5 text-[10px] text-slate-500">高さ <input type="number" v-model.number="block.baseHeight" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
+                      </div>
+                      <div v-for="(action, ai) in block.actions" :key="ai" class="border border-[#ebedf0] rounded-[10px] p-3 space-y-2">
+                        <div class="flex items-center justify-between">
+                          <span class="text-[10px] font-bold text-slate-500">エリア {{ ai + 1 }}</span>
+                          <button v-if="block.actions.length > 1" @click="removeImageMapAction(block, ai)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center">×</button>
+                        </div>
+                        <div class="grid grid-cols-4 gap-1.5">
+                          <label class="text-[9px] text-slate-500">X <input type="number" v-model.number="action.x" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
+                          <label class="text-[9px] text-slate-500">Y <input type="number" v-model.number="action.y" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
+                          <label class="text-[9px] text-slate-500">幅 <input type="number" v-model.number="action.width" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
+                          <label class="text-[9px] text-slate-500">高さ <input type="number" v-model.number="action.height" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
+                        </div>
+                        <div class="flex gap-2">
+                          <select v-model="action.type" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 bg-white"><option value="uri">URL遷移</option><option value="message">メッセージ送信</option></select>
+                          <input v-model="action.value" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" :placeholder="action.type === 'uri' ? 'https://...' : '送信テキスト'" />
+                        </div>
+                      </div>
+                      <button @click="addImageMapAction(block)" class="w-full py-2 border-2 border-dashed border-[#ebedf0] rounded-[10px] text-[10px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">+ タップエリア追加</button>
                     </div>
-                    <div class="flex gap-2">
-                      <select v-model="action.type" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 bg-white"><option value="uri">URL遷移</option><option value="message">メッセージ送信</option></select>
-                      <input v-model="action.value" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" :placeholder="action.type === 'uri' ? 'https://...' : '送信テキスト'" />
-                    </div>
-                    <input v-model="action.label" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="ラベル（例: 詳しく見る）" />
-                  </div>
-                  <button @click="addImageMapAction" class="w-full py-2 border-2 border-dashed border-[#ebedf0] rounded-[13px] text-[10px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">+ タップエリア追加</button>
+                  </template>
                 </div>
               </div>
-            </template>
+            </div>
           </div>
 
           <!-- Save bar -->
@@ -463,7 +450,7 @@ const sendLineTest = async () => {
                 <option value="集客最大化タイプ">集客最大化タイプ</option>
                 <option value="コスト削減タイプ">コスト削減タイプ</option>
               </select>
-              <button @click="$emit('save')" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:brightness-110 transition">テンプレートとして保存</button>
+              <button @click="saveScenario" :disabled="lineScenarioBlocks.length === 0" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:brightness-110 transition disabled:opacity-40">リテンションシナリオとして保存</button>
             </div>
           </div>
         </div>
@@ -478,41 +465,39 @@ const sendLineTest = async () => {
                 <span class="text-white text-xs font-bold">公式アカウント</span>
               </div>
               <div class="p-3 space-y-2 bg-[#8CABD9] min-h-[340px]">
+                <div v-if="lineScenarioBlocks.length === 0" class="text-center py-8"><p class="text-[10px] text-white/70">メッセージを追加するとプレビュー表示</p></div>
 
-                <!-- Text preview -->
-                <template v-if="lineMessageType === 'text'">
-                  <div v-if="lineBlocks.length === 0" class="text-center py-8"><p class="text-[10px] text-white/70">ブロックを追加するとプレビュー表示</p></div>
-                  <template v-for="block in lineBlocks" :key="block.id">
-                    <div v-if="block.type === 'text' && block.text" class="flex justify-start"><div class="bg-white rounded-2xl rounded-tl-sm px-3 py-2 max-w-[220px] shadow-sm"><p class="text-[11px] text-slate-800 whitespace-pre-wrap break-words">{{ block.text }}</p></div></div>
-                    <div v-if="block.type === 'image' && block.url" class="flex justify-start"><div class="bg-white rounded-2xl rounded-tl-sm overflow-hidden max-w-[220px] shadow-sm"><img :src="block.url" class="w-full object-cover" /></div></div>
-                    <div v-if="block.type === 'button' && block.label" class="flex justify-start"><div class="bg-white rounded-2xl rounded-tl-sm overflow-hidden max-w-[220px] shadow-sm w-full"><div class="px-3 py-2.5 text-center"><span class="text-[11px] font-bold text-emerald-600">{{ block.label }}</span></div></div></div>
+                <template v-for="block in lineScenarioBlocks" :key="block.id">
+                  <!-- text sub-blocks preview -->
+                  <template v-if="block.kind === 'text'">
+                    <template v-for="sub in block.subBlocks" :key="sub.id">
+                      <div v-if="sub.type === 'text' && sub.text" class="flex justify-start"><div class="bg-white rounded-2xl rounded-tl-sm px-3 py-2 max-w-[220px] shadow-sm"><p class="text-[11px] text-slate-800 whitespace-pre-wrap break-words">{{ sub.text }}</p></div></div>
+                      <div v-if="sub.type === 'image' && sub.url" class="flex justify-start"><div class="bg-white rounded-2xl rounded-tl-sm overflow-hidden max-w-[220px] shadow-sm"><img :src="sub.url" class="w-full object-cover" /></div></div>
+                      <div v-if="sub.type === 'button' && sub.label" class="flex justify-start"><div class="bg-white rounded-2xl rounded-tl-sm overflow-hidden max-w-[220px] shadow-sm w-full"><div class="px-3 py-2.5 text-center"><span class="text-[11px] font-bold text-emerald-600">{{ sub.label }}</span></div></div></div>
+                    </template>
                   </template>
-                </template>
 
-                <!-- Flex preview -->
-                <template v-else-if="lineMessageType === 'flex'">
-                  <div class="flex justify-start">
+                  <!-- flex preview -->
+                  <div v-else-if="block.kind === 'flex'" class="flex justify-start">
                     <div class="bg-white rounded-[13px] overflow-hidden shadow-sm w-[240px]">
-                      <img v-if="flexData.heroImage" :src="flexData.heroImage" class="w-full h-28 object-cover" @error="$event.target.style.display='none'" />
+                      <img v-if="block.heroImage" :src="block.heroImage" class="w-full h-28 object-cover" @error="$event.target.style.display='none'" />
                       <div v-else class="h-20 bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center text-slate-300 text-xs">Hero Image</div>
                       <div class="p-3">
-                        <p class="text-xs font-bold text-slate-900">{{ flexData.title || 'タイトル' }}</p>
-                        <p v-if="flexData.subtitle" class="text-[10px] text-slate-400 mt-0.5">{{ flexData.subtitle }}</p>
-                        <p v-for="(t, i) in flexData.bodyTexts" :key="i" class="text-[10px] text-slate-600 mt-1.5 leading-relaxed">{{ t || '本文テキスト' }}</p>
+                        <p class="text-xs font-bold text-slate-900">{{ block.title || 'タイトル' }}</p>
+                        <p v-if="block.subtitle" class="text-[10px] text-slate-400 mt-0.5">{{ block.subtitle }}</p>
+                        <p v-for="(t, i) in block.bodyTexts" :key="i" class="text-[10px] text-slate-600 mt-1.5 leading-relaxed">{{ t || '本文テキスト' }}</p>
                       </div>
-                      <div v-if="flexData.footerButtons.some(b => b.label)" class="border-t border-slate-100">
-                        <template v-for="(btn, i) in flexData.footerButtons" :key="i">
+                      <div v-if="block.footerButtons.some(b => b.label)" class="border-t border-slate-100">
+                        <template v-for="(btn, i) in block.footerButtons" :key="i">
                           <div v-if="btn.label" class="text-center py-2 border-b border-slate-50 last:border-b-0"><span class="text-[11px] font-bold text-emerald-600">{{ btn.label }}</span></div>
                         </template>
                       </div>
                     </div>
                   </div>
-                </template>
 
-                <!-- Carousel preview -->
-                <template v-else-if="lineMessageType === 'carousel'">
-                  <div class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 snap-x" style="scrollbar-width:thin">
-                    <div v-for="(card, ci) in carouselCards" :key="ci" class="bg-white rounded-[13px] overflow-hidden shadow-sm min-w-[180px] max-w-[180px] shrink-0 snap-start">
+                  <!-- carousel preview -->
+                  <div v-else-if="block.kind === 'carousel'" class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 snap-x" style="scrollbar-width:thin">
+                    <div v-for="(card, ci) in block.cards" :key="ci" class="bg-white rounded-[13px] overflow-hidden shadow-sm min-w-[180px] max-w-[180px] shrink-0 snap-start">
                       <div v-if="card.imageUrl" class="h-24 bg-slate-100"><img :src="card.imageUrl" class="w-full h-full object-cover" @error="$event.target.style.display='none'" /></div>
                       <div v-else class="h-24 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-[10px] text-slate-300">画像</div>
                       <div class="p-2.5">
@@ -524,16 +509,14 @@ const sendLineTest = async () => {
                       </template>
                     </div>
                   </div>
-                </template>
 
-                <!-- ImageMap preview -->
-                <template v-else-if="lineMessageType === 'imagemap'">
-                  <div class="flex justify-start">
+                  <!-- imagemap preview -->
+                  <div v-else-if="block.kind === 'imagemap'" class="flex justify-start">
                     <div class="relative w-[240px] rounded-[13px] overflow-hidden shadow-sm">
-                      <img v-if="imageMapData.baseUrl" :src="imageMapData.baseUrl" class="w-full" @error="$event.target.style.display='none'" />
+                      <img v-if="block.baseUrl" :src="block.baseUrl" class="w-full" @error="$event.target.style.display='none'" />
                       <div v-else class="h-40 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-[10px] text-slate-400">画像を設定してください</div>
-                      <template v-if="imageMapData.baseUrl">
-                        <div v-for="(action, ai) in imageMapData.actions" :key="ai" class="absolute border-2 border-white/60 bg-white/10 flex items-center justify-center backdrop-blur-[1px]" :style="{ left: (action.x / imageMapData.baseWidth * 100) + '%', top: (action.y / imageMapData.baseHeight * 100) + '%', width: (action.width / imageMapData.baseWidth * 100) + '%', height: (action.height / imageMapData.baseHeight * 100) + '%' }">
+                      <template v-if="block.baseUrl">
+                        <div v-for="(action, ai) in block.actions" :key="ai" class="absolute border-2 border-white/60 bg-white/10 flex items-center justify-center backdrop-blur-[1px]" :style="{ left: (action.x / block.baseWidth * 100) + '%', top: (action.y / block.baseHeight * 100) + '%', width: (action.width / block.baseWidth * 100) + '%', height: (action.height / block.baseHeight * 100) + '%' }">
                           <span class="text-[8px] bg-black/50 text-white px-1.5 py-0.5 rounded font-bold">{{ action.label || ai + 1 }}</span>
                         </div>
                       </template>
