@@ -54,6 +54,12 @@ const navGroups = [
       { id: 'user-liff', label: 'LIFF体験', icon: '📱' },
     ],
   },
+  {
+    label: '設定',
+    items: [
+      { id: 'settings', label: '設定', icon: '⚙️' },
+    ],
+  },
 ]
 
 const expandedItems = ref(['ai-content'])

@@ -15,6 +15,7 @@ import InboxTab from './components/tabs/InboxTab.vue'
 import CalendarTab from './components/tabs/CalendarTab.vue'
 import AutoReplyTab from './components/tabs/AutoReplyTab.vue'
 import TagsSegmentsTab from './components/tabs/TagsSegmentsTab.vue'
+import SettingsTab from './components/tabs/SettingsTab.vue'
 
 const crm = useCrm()
 </script>
@@ -202,6 +203,18 @@ const crm = useCrm()
         @update:liffSelectedCustomerId="crm.liffSelectedCustomerId.value = $event"
         @update:liffAnswers="crm.liffAnswers.value = $event"
         @submit="crm.handleLiffSubmit"
+      />
+
+      <SettingsTab
+        v-else-if="crm.activeTab.value === 'settings'"
+        :userEmail="crm.userEmail.value"
+        :teamMembers="crm.teamMembers.value"
+        :currentUserId="crm.currentUserId.value"
+        :integrationConfigs="crm.integrationConfigs.value"
+        @updateDisplayName="crm.updateMyDisplayName"
+        @saveIntegration="crm.saveIntegrationConfig"
+        @toggleIntegration="crm.toggleIntegrationConfig"
+        @deleteIntegration="crm.deleteIntegrationConfig"
       />
     </div>
 

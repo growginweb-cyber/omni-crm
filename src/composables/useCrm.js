@@ -442,6 +442,50 @@ export function useCrm() {
     teamMembers.value = data || []
   }
 
+  const currentUserId = ref(null)
+
+  const updateMyDisplayName = async (name) => {
+    if (!currentUserId.value) return
+    await supabase.from('profiles').update({ display_name: name }).eq('id', currentUserId.value)
+    const m = teamMembers.value.find(m => m.id === currentUserId.value)
+    if (m) m.display_name = name
+  }
+
+  // --- 外部CRM/ATS連携（接続先未定のため汎用スキーマ） ---
+  const integrationConfigs = ref([])
+
+  const fetchIntegrationConfigs = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('integration_configs')
+      .select('*')
+      .eq('tenant_id', currentTenantId.value)
+      .order('created_at', { ascending: true })
+    integrationConfigs.value = data || []
+  }
+
+  const saveIntegrationConfig = async ({ provider, webhookUrl }) => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase.from('integration_configs').insert([{
+      tenant_id: currentTenantId.value,
+      provider: provider || 'custom',
+      webhook_url: webhookUrl || null,
+      enabled: false,
+    }]).select().single()
+    if (data) integrationConfigs.value.push(data)
+  }
+
+  const toggleIntegrationConfig = async ({ id, enabled }) => {
+    await supabase.from('integration_configs').update({ enabled }).eq('id', id)
+    const c = integrationConfigs.value.find(c => c.id === id)
+    if (c) c.enabled = enabled
+  }
+
+  const deleteIntegrationConfig = async (id) => {
+    await supabase.from('integration_configs').delete().eq('id', id)
+    integrationConfigs.value = integrationConfigs.value.filter(c => c.id !== id)
+  }
+
   const updateCustomerStage = async ({ id, stage }) => {
     await supabase.from('customers').update({ pipeline_stage: stage, last_contacted_at: new Date().toISOString() }).eq('id', id)
     const c = customers.value.find(c => c.id === id)
@@ -518,6 +562,7 @@ export function useCrm() {
   }
 
   const fetchUserTenant = async (userId) => {
+    currentUserId.value = userId
     const { data } = await supabase.from('profiles').select('tenant_id').eq('id', userId).single()
     if (data) {
       currentTenantId.value = data.tenant_id
@@ -531,6 +576,7 @@ export function useCrm() {
         fetchCalendarEvents(),
         fetchAutoreplyRules(),
         fetchConversations(),
+        fetchIntegrationConfigs(),
       ])
       await fetchScenarioDefs()
       await fetchTeamMembers()
@@ -1115,5 +1161,11 @@ export function useCrm() {
     updateCustomerStage,
     assignRecruiter,
     engagementScore,
+    currentUserId,
+    updateMyDisplayName,
+    integrationConfigs,
+    saveIntegrationConfig,
+    toggleIntegrationConfig,
+    deleteIntegrationConfig,
   }
 }
