@@ -330,6 +330,12 @@ export function useCrm() {
     }
   }
 
+  const toggleConversationStatus = async ({ id, status }) => {
+    await supabase.from('conversations').update({ status }).eq('id', id)
+    const conv = conversations.value.find(c => c.id === id)
+    if (conv) conv.status = status
+  }
+
   const sendInboxMessage = async () => {
     const conv = selectedConversation.value
     if (!conv || !inboxDraft.value.trim() || !currentTenantId.value) return
@@ -1142,6 +1148,7 @@ export function useCrm() {
     isSendingInbox,
     selectConversation,
     sendInboxMessage,
+    toggleConversationStatus,
     scenarioDefs,
     selectedScenarioDefId,
     selectedScenarioDef,

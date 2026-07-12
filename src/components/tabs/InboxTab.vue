@@ -9,7 +9,7 @@ const props = defineProps({
   inboxDraft: String,
   isSendingInbox: Boolean,
 })
-const emit = defineEmits(['selectConversation', 'update:inboxDraft', 'send'])
+const emit = defineEmits(['selectConversation', 'update:inboxDraft', 'send', 'toggleStatus'])
 
 const filter = ref('all')
 
@@ -114,6 +114,15 @@ const formatTime = (dateStr) => {
               <div class="text-[11px] text-[#9097a1] mt-0.5">{{ selectedConversation.customers?.line_uid || selectedConversation.customers?.email || '' }}</div>
             </div>
           </div>
+          <button
+            @click="$emit('toggleStatus', { id: selectedConversation.id, status: selectedConversation.status === '対応済み' ? '未対応' : '対応済み' })"
+            :class="[
+              'text-[11.5px] font-semibold px-3 py-1.5 rounded-[8px] border transition-colors',
+              selectedConversation.status === '対応済み'
+                ? 'bg-[#e6f8ee] text-[#06914a] border-[#c8f0d8]'
+                : 'bg-white text-[#3a3f47] border-[#e6e8ec] hover:bg-[#f1f2f4]',
+            ]"
+          >{{ selectedConversation.status === '対応済み' ? '✓ 対応済み' : '対応済みにする' }}</button>
         </header>
 
         <div class="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-3">

@@ -61,6 +61,7 @@ const crm = useCrm()
         @selectConversation="crm.selectConversation"
         @update:inboxDraft="crm.inboxDraft.value = $event"
         @send="crm.sendInboxMessage"
+        @toggleStatus="crm.toggleConversationStatus"
       />
 
       <AnalyticsTab
