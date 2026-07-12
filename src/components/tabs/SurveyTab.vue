@@ -10,6 +10,21 @@ const props = defineProps({
   isCreatingQuestion: Boolean,
   savedTemplates: Array,
   flowJson: Object,
+  tagGroups: Array,
+  tagDefinitions: Array,
+})
+
+// タググループごとにタグをまとめる（未分類含む・タグ分岐ノードの選択肢用）
+const groupedTagOptions = computed(() => {
+  const defs = props.tagDefinitions || []
+  const groups = (props.tagGroups || []).map(g => ({
+    id: g.id,
+    name: g.name,
+    tags: defs.filter(t => t.group_id === g.id),
+  })).filter(g => g.tags.length > 0)
+  const ungrouped = defs.filter(t => !t.group_id)
+  if (ungrouped.length > 0) groups.push({ id: null, name: '未分類', tags: ungrouped })
+  return groups
 })
 const emit = defineEmits(['update:newCampaignTitle', 'update:newQuestionText', 'selectCampaign', 'saveFlow', 'createCampaign', 'toggleActiveCampaign', 'createQuestion', 'addChoice'])
 
@@ -458,7 +473,13 @@ const selectedCampaign = computed(() => {
                     <button v-if="selectedNode.data.conditions.length > 1" @click="removeTagCondition(selectedNode, ci)" class="text-red-400 text-[10px]">×</button>
                   </div>
                   <input v-model="cond.match" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:border-[#4f46e5]" placeholder="マッチ条件（例: 回答A）" />
-                  <input v-model="cond.tag" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:border-[#4f46e5]" placeholder="付与タグ（例: 集客最大化タイプ）" />
+                  <select v-model="cond.tag" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:border-[#4f46e5]">
+                    <option value="">付与タグを選択...</option>
+                    <optgroup v-for="g in groupedTagOptions" :key="g.id ?? 'ungrouped'" :label="g.name">
+                      <option v-for="t in g.tags" :key="t.id" :value="t.name">{{ t.name }}</option>
+                    </optgroup>
+                  </select>
+                  <p v-if="groupedTagOptions.length === 0" class="text-[9px] text-[#c2c7cf]">タグ・セグメント画面でタグを作成してください</p>
                 </div>
                 <button @click="addTagCondition(selectedNode)" class="text-[10px] font-semibold text-[#E0533D] hover:brightness-110">+ 条件追加</button>
               </div>
