@@ -19,18 +19,32 @@ const channels = [
   { id: 'SMS', label: 'SMS', icon: '💬', color: 'violet' },
 ]
 
-// ==================== LINE: 複数メッセージ種別を1つのシナリオにまとめる ====================
-const lineScenarioBlocks = ref([])
-const activeBlockId = ref(null)
+// ==================== LINE: ノード接続式のリテンションシナリオビルダー ====================
+const NODE_W = 200
 
-const blockKindMeta = {
-  text: { label: 'テキスト/画像/ボタン', icon: '📝' },
-  flex: { label: 'フレックス', icon: '🎴' },
-  carousel: { label: 'カルーセル', icon: '🎠' },
-  imagemap: { label: 'イメージマップ', icon: '🗺' },
+const nodeKindMeta = {
+  start: { label: '配信開始', icon: '🚀', color: '#06914a' },
+  text: { label: 'テキスト/画像/ボタン', icon: '📝', color: '#4f46e5' },
+  flex: { label: 'フレックス', icon: '🎴', color: '#8B5CF6' },
+  carousel: { label: 'カルーセル', icon: '🎠', color: '#d97706' },
+  imagemap: { label: 'イメージマップ', icon: '🗺', color: '#2954d4' },
 }
+const nodeKindList = ['text', 'flex', 'carousel', 'imagemap']
 
-const defaultBlockData = (kind) => {
+const DEFAULT_LINE_NODES = [{ id: 'start-1', kind: 'start', x: 320, y: 30, data: { label: '配信開始' } }]
+
+const lineNodes = ref(JSON.parse(JSON.stringify(DEFAULT_LINE_NODES)))
+const lineConnections = ref([])
+const selectedLineNodeId = ref(null)
+const lineCanvasRef = ref(null)
+const lineConnectingFrom = ref(null)
+const lineTempLineEnd = ref(null)
+
+const selectedLineNode = computed(() => lineNodes.value.find(n => n.id === selectedLineNodeId.value))
+const lineNodeMeta = (kind) => nodeKindMeta[kind] || nodeKindMeta.text
+const lineNodeColor = (id) => lineNodeMeta(lineNodes.value.find(n => n.id === id)?.kind).color
+
+const defaultNodeData = (kind) => {
   if (kind === 'text') return { subBlocks: [] }
   if (kind === 'flex') return { heroImage: '', title: '', subtitle: '', bodyTexts: [''], footerButtons: [{ label: '', url: '' }] }
   if (kind === 'carousel') return { cards: [{ imageUrl: '', title: '', text: '', buttons: [{ label: '', url: '' }] }] }
@@ -38,48 +52,132 @@ const defaultBlockData = (kind) => {
   return {}
 }
 
-const addScenarioBlock = (kind) => {
-  const block = { id: Date.now() + Math.random(), kind, ...defaultBlockData(kind) }
-  lineScenarioBlocks.value.push(block)
-  activeBlockId.value = block.id
+const addLineNode = (kind) => {
+  const id = kind + '-' + Date.now()
+  const maxY = lineNodes.value.reduce((m, n) => Math.max(m, n.y), 0)
+  lineNodes.value.push({ id, kind, x: 320, y: maxY + 130, data: defaultNodeData(kind) })
+  selectedLineNodeId.value = id
   syncContent()
 }
 
-const removeScenarioBlock = (index) => {
-  lineScenarioBlocks.value.splice(index, 1)
+const removeLineNode = (id) => {
+  lineNodes.value = lineNodes.value.filter(n => n.id !== id)
+  lineConnections.value = lineConnections.value.filter(c => c.from !== id && c.to !== id)
+  if (selectedLineNodeId.value === id) selectedLineNodeId.value = null
   syncContent()
 }
 
-const moveScenarioBlock = (from, to) => {
-  if (to < 0 || to >= lineScenarioBlocks.value.length) return
-  const item = lineScenarioBlocks.value.splice(from, 1)[0]
-  lineScenarioBlocks.value.splice(to, 0, item)
-  syncContent()
+const getLinePortPos = (node, isOutput) => {
+  if (isOutput) return { x: node.x + NODE_W / 2, y: node.y + 56 }
+  return { x: node.x + NODE_W / 2, y: node.y }
 }
 
-const toggleActiveBlock = (id) => {
-  activeBlockId.value = activeBlockId.value === id ? null : id
+const getLinePath = (conn) => {
+  const from = lineNodes.value.find(n => n.id === conn.from)
+  const to = lineNodes.value.find(n => n.id === conn.to)
+  if (!from || !to) return ''
+  const p1 = getLinePortPos(from, true)
+  const p2 = getLinePortPos(to, false)
+  const dy = Math.abs(p2.y - p1.y)
+  const cy = Math.max(dy * 0.4, 30)
+  return `M ${p1.x} ${p1.y} C ${p1.x} ${p1.y + cy}, ${p2.x} ${p2.y - cy}, ${p2.x} ${p2.y}`
 }
 
-// テキスト種別ブロック内のサブブロック（テキスト/画像/ボタン）操作
-const addSubBlock = (block, type) => {
+const lineTempPath = computed(() => {
+  if (!lineConnectingFrom.value || !lineTempLineEnd.value) return ''
+  const from = lineNodes.value.find(n => n.id === lineConnectingFrom.value.nodeId)
+  if (!from) return ''
+  const p1 = getLinePortPos(from, true)
+  const p2 = lineTempLineEnd.value
+  const dy = Math.abs(p2.y - p1.y)
+  const cy = Math.max(dy * 0.4, 30)
+  return `M ${p1.x} ${p1.y} C ${p1.x} ${p1.y + cy}, ${p2.x} ${p2.y - cy}, ${p2.x} ${p2.y}`
+})
+
+const lineCanvasCoords = (e) => {
+  if (!lineCanvasRef.value) return { x: 0, y: 0 }
+  const rect = lineCanvasRef.value.getBoundingClientRect()
+  return { x: e.clientX - rect.left + lineCanvasRef.value.scrollLeft, y: e.clientY - rect.top + lineCanvasRef.value.scrollTop }
+}
+
+const startLineDrag = (node, e) => {
+  if (e.target.closest('.port')) return
+  e.preventDefault()
+  selectedLineNodeId.value = node.id
+  const start = lineCanvasCoords(e)
+  const ox = start.x - node.x, oy = start.y - node.y
+  const onMove = (me) => { const p = lineCanvasCoords(me); node.x = p.x - ox; node.y = p.y - oy }
+  const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
+const startLineConnect = (nodeId, e) => {
+  e.stopPropagation(); e.preventDefault()
+  lineConnectingFrom.value = { nodeId }
+  const onMove = (me) => { lineTempLineEnd.value = lineCanvasCoords(me) }
+  const onUp = (me) => {
+    const el = document.elementFromPoint(me.clientX, me.clientY)
+    const port = el?.closest('[data-input-port]')
+    if (port) {
+      const toId = port.dataset.inputPort
+      if (toId !== nodeId) {
+        lineConnections.value = lineConnections.value.filter(c => c.from !== nodeId)
+        lineConnections.value.push({ from: nodeId, to: toId })
+        syncContent()
+      }
+    }
+    lineConnectingFrom.value = null; lineTempLineEnd.value = null
+    document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
+const removeLineConnection = (ci) => { lineConnections.value.splice(ci, 1); syncContent() }
+
+// テキスト種別ノード内のサブブロック（テキスト/画像/ボタン）操作
+const addSubBlock = (node, type) => {
   const sub = { id: Date.now() + Math.random(), type }
   if (type === 'text') sub.text = ''
   if (type === 'image') sub.url = ''
   if (type === 'button') { sub.label = ''; sub.url = '' }
-  block.subBlocks.push(sub)
+  node.data.subBlocks.push(sub)
   syncContent()
 }
-const removeSubBlock = (block, index) => { block.subBlocks.splice(index, 1); syncContent() }
+const removeSubBlock = (node, index) => { node.data.subBlocks.splice(index, 1); syncContent() }
 
-const addCarouselCard = (block) => { if (block.cards.length < 10) block.cards.push({ imageUrl: '', title: '', text: '', buttons: [{ label: '', url: '' }] }) }
-const removeCarouselCard = (block, i) => { block.cards.splice(i, 1) }
-const addImageMapAction = (block) => { block.actions.push({ x: 0, y: 0, width: 520, height: 520, type: 'uri', value: '', label: '' }) }
-const removeImageMapAction = (block, i) => { block.actions.splice(i, 1) }
+const addCarouselCard = (node) => { if (node.data.cards.length < 10) node.data.cards.push({ imageUrl: '', title: '', text: '', buttons: [{ label: '', url: '' }] }) }
+const removeCarouselCard = (node, i) => { node.data.cards.splice(i, 1) }
+const addImageMapAction = (node) => { node.data.actions.push({ x: 0, y: 0, width: 520, height: 520, type: 'uri', value: '', label: '' }) }
+const removeImageMapAction = (node, i) => { node.data.actions.splice(i, 1) }
+
+// 開始ノードから接続をたどってメッセージの送信順を決定する
+const orderedLineNodes = () => {
+  const startNode = lineNodes.value.find(n => n.kind === 'start')
+  const visited = new Set()
+  const ordered = []
+  let current = startNode
+  while (current) {
+    const next = lineConnections.value.find(c => c.from === current.id)
+    if (!next || visited.has(next.to)) break
+    const nextNode = lineNodes.value.find(n => n.id === next.to)
+    if (!nextNode) break
+    ordered.push(nextNode)
+    visited.add(nextNode.id)
+    current = nextNode
+  }
+  // 未接続のノードは末尾に追加（作成順）
+  lineNodes.value.forEach(n => {
+    if (n.kind !== 'start' && !visited.has(n.id)) ordered.push(n)
+  })
+  return ordered
+}
 
 const syncContent = () => {
-  emit('update:generatedContent', summarizeLineBlocks(lineScenarioBlocks.value))
-  emit('update:generatedMessagesJson', buildLineMessages(lineScenarioBlocks.value))
+  const blocks = orderedLineNodes().map(n => ({ kind: n.kind, ...n.data }))
+  emit('update:generatedContent', summarizeLineBlocks(blocks))
+  emit('update:generatedMessagesJson', buildLineMessages(blocks))
 }
 
 const smsText = ref('')
@@ -250,7 +348,8 @@ const sendLineTest = async () => {
   isSendingTest.value = true
   testSendResult.value = ''
   try {
-    const messages = buildLineMessages(lineScenarioBlocks.value)
+    const blocks = orderedLineNodes().map(n => ({ kind: n.kind, ...n.data }))
+    const messages = buildLineMessages(blocks)
     const { error } = await supabase.functions.invoke('send-line-message', {
       body: { line_uid: uid, messages: messages.length ? messages : undefined, text_content: messages.length ? undefined : 'テスト送信' }
     })
@@ -265,8 +364,9 @@ const sendLineTest = async () => {
 
 const saveScenario = () => {
   emit('save')
-  lineScenarioBlocks.value = []
-  activeBlockId.value = null
+  lineNodes.value = JSON.parse(JSON.stringify(DEFAULT_LINE_NODES))
+  lineConnections.value = []
+  selectedLineNodeId.value = null
 }
 </script>
 
@@ -293,148 +393,69 @@ const saveScenario = () => {
     </div>
 
     <div class="flex-1 flex overflow-hidden">
-      <!-- ==================== LINE Editor ==================== -->
+      <!-- ==================== LINE Editor (Node Canvas) ==================== -->
       <template v-if="selectedChannel === 'LINE'">
         <div class="flex-1 min-w-0 flex flex-col border-r border-[#ebedf0] bg-white overflow-hidden">
           <!-- Header -->
           <div class="px-5 py-3 border-b border-[#ebedf0] shrink-0">
             <h3 class="text-[12px] font-semibold text-[#6b7280] mb-2">リテンションシナリオ（LINE）</h3>
             <input :value="templateTitle" @input="$emit('update:templateTitle', $event.target.value)" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition" placeholder="シナリオ名（例: 初回クーポン配信）" />
-            <p class="text-[10px] text-slate-400 mt-1.5">テキスト・フレックス・カルーセル・イメージマップを自由に組み合わせて、1つのシナリオとして送信できます</p>
+            <p class="text-[10px] text-slate-400 mt-1.5">ノードをつないで、テキスト・フレックス・カルーセル・イメージマップを組み合わせた配信シナリオを設計できます</p>
           </div>
 
-          <!-- Add block toolbar -->
-          <div class="px-5 py-2 bg-[#f7f8fa] border-b border-[#ebedf0] flex gap-1.5 shrink-0">
-            <button v-for="(meta, kind) in blockKindMeta" :key="kind" @click="addScenarioBlock(kind)" class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-[#3a3f47] bg-white border border-[#e6e8ec] rounded-[8px] hover:bg-[#f1f2f4] transition-colors">
-              <span>{{ meta.icon }}</span> ＋{{ meta.label }}
+          <!-- Add node toolbar -->
+          <div class="px-5 py-2 bg-[#f7f8fa] border-b border-[#ebedf0] flex gap-1.5 shrink-0 flex-wrap">
+            <button v-for="kind in nodeKindList" :key="kind" @click="addLineNode(kind)" class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-[#3a3f47] bg-white border border-[#e6e8ec] rounded-[8px] hover:bg-[#f1f2f4] transition-colors">
+              <span>{{ nodeKindMeta[kind].icon }}</span> ＋{{ nodeKindMeta[kind].label }}
             </button>
           </div>
 
-          <!-- Block list -->
-          <div class="flex-1 overflow-y-auto p-5">
-            <div v-if="lineScenarioBlocks.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
-              <div class="text-3xl mb-2">🗂️</div>
-              <p class="text-xs text-slate-400">上のボタンからメッセージを追加してシナリオを組み立てましょう</p>
-              <p class="text-[10px] text-slate-300 mt-1">複数追加すると、その順番でまとめて配信されます</p>
+          <!-- Canvas -->
+          <div ref="lineCanvasRef" class="flex-1 overflow-auto relative cursor-grab active:cursor-grabbing bg-[#f6f7f9]" style="background-image:radial-gradient(#dfe2e7 1px,transparent 1px);background-size:22px 22px">
+            <!-- Legend -->
+            <div class="absolute left-4 top-3.5 z-10 flex gap-3.5 bg-white/90 border border-[#ebedf0] rounded-[10px] px-3.5 py-2 shadow-sm text-[11px] text-[#3a3f47] flex-wrap max-w-[90%]">
+              <span v-for="(meta, kind) in nodeKindMeta" :key="kind" class="flex items-center gap-1.5">
+                <span class="w-[11px] h-[11px] rounded-[3px] inline-block" :style="{ backgroundColor: meta.color }"></span>
+                {{ meta.label }}
+              </span>
             </div>
 
-            <div class="space-y-3">
-              <div
-                v-for="(block, i) in lineScenarioBlocks"
-                :key="block.id"
-                class="bg-white border border-[#ebedf0] rounded-[13px] overflow-hidden group"
-                :class="activeBlockId === block.id ? 'ring-2 ring-emerald-400' : ''"
-              >
-                <!-- Block header -->
-                <button @click="toggleActiveBlock(block.id)" class="w-full flex items-center justify-between px-4 py-3 bg-[#fafbfc] hover:bg-[#f4f5f6] transition-colors">
-                  <div class="flex items-center gap-2">
-                    <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center justify-center">{{ i + 1 }}</span>
-                    <span class="text-[11px] font-bold text-slate-700">{{ blockKindMeta[block.kind].icon }} {{ blockKindMeta[block.kind].label }}</span>
-                  </div>
-                  <div class="flex items-center gap-1">
-                    <span @click.stop="moveScenarioBlock(i, i - 1)" :class="['w-5 h-5 rounded text-[10px] flex items-center justify-center', i === 0 ? 'text-slate-200' : 'bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer']">↑</span>
-                    <span @click.stop="moveScenarioBlock(i, i + 1)" :class="['w-5 h-5 rounded text-[10px] flex items-center justify-center', i === lineScenarioBlocks.length - 1 ? 'text-slate-200' : 'bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer']">↓</span>
-                    <span @click.stop="removeScenarioBlock(i)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center cursor-pointer">×</span>
-                    <span class="text-[9px] text-slate-300 ml-1">{{ activeBlockId === block.id ? '▲' : '▼' }}</span>
-                  </div>
-                </button>
+            <svg class="absolute top-0 left-0 pointer-events-none" style="width:3000px;height:2000px">
+              <path v-for="(conn, ci) in lineConnections" :key="ci" :d="getLinePath(conn)" fill="none" :stroke="lineNodeColor(conn.from)" stroke-width="2" opacity="0.55" />
+              <path v-if="lineTempPath" :d="lineTempPath" fill="none" stroke="#4f46e5" stroke-width="2" stroke-dasharray="6 3" opacity="0.55" />
+            </svg>
 
-                <div v-if="activeBlockId === block.id" class="p-4 border-t border-[#ebedf0]">
-                  <!-- ===== text kind ===== -->
-                  <template v-if="block.kind === 'text'">
-                    <div class="flex gap-2 mb-3">
-                      <button v-for="bt in [{type:'text',label:'テキスト',icon:'📝'},{type:'image',label:'画像',icon:'🖼'},{type:'button',label:'ボタン',icon:'🔘'}]" :key="bt.type" @click="addSubBlock(block, bt.type)" class="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-[#3a3f47] bg-white border border-[#e6e8ec] rounded-[7px] hover:bg-[#f1f2f4] transition-colors">
-                        <span>{{ bt.icon }}</span> {{ bt.label }}
-                      </button>
-                    </div>
-                    <div v-if="block.subBlocks.length === 0" class="text-center py-6 text-[11px] text-slate-300">テキスト・画像・ボタンを追加してください</div>
-                    <div class="space-y-2.5">
-                      <div v-for="(sub, si) in block.subBlocks" :key="sub.id" class="bg-[#f7f8fa] border border-[#ebedf0] rounded-[10px] p-3 relative group/sub">
-                        <button @click="removeSubBlock(block, si)" class="absolute top-2 right-2 w-5 h-5 rounded text-[10px] bg-white text-red-400 hover:text-red-600 flex items-center justify-center opacity-0 group-hover/sub:opacity-100 transition-opacity">×</button>
-                        <textarea v-if="sub.type === 'text'" v-model="sub.text" @input="syncContent" rows="2" class="w-full bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition resize-none" placeholder="メッセージテキスト"></textarea>
-                        <input v-if="sub.type === 'image'" v-model="sub.url" @input="syncContent" class="w-full bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（https://...）" />
-                        <div v-if="sub.type === 'button'" class="flex gap-2">
-                          <input v-model="sub.label" @input="syncContent" class="flex-1 bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ボタンラベル" />
-                          <input v-model="sub.url" @input="syncContent" class="flex-1 bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="リンクURL" />
-                        </div>
-                      </div>
-                    </div>
-                  </template>
+            <div v-for="node in lineNodes" :key="node.id" class="absolute select-none" :style="{ left: node.x + 'px', top: node.y + 'px', width: NODE_W + 'px' }" @mousedown="startLineDrag(node, $event)">
+              <!-- Input port -->
+              <div v-if="node.kind !== 'start'" class="port absolute -top-[6px] left-1/2 -translate-x-1/2 w-[11px] h-[11px] rounded-full bg-white border-2 hover:scale-125 cursor-crosshair z-20 transition-all" :style="{ borderColor: lineNodeMeta(node.kind).color }" :data-input-port="node.id"></div>
 
-                  <!-- ===== flex kind ===== -->
-                  <template v-else-if="block.kind === 'flex'">
-                    <div class="space-y-3">
-                      <input v-model="block.heroImage" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ヒーロー画像URL（任意）" />
-                      <input v-model="block.title" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトル" />
-                      <input v-model="block.subtitle" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="サブタイトル（任意）" />
-                      <div v-for="(_, ti) in block.bodyTexts" :key="ti" class="flex gap-2">
-                        <textarea v-model="block.bodyTexts[ti]" @input="syncContent" rows="2" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="本文テキスト"></textarea>
-                        <button v-if="block.bodyTexts.length > 1" @click="block.bodyTexts.splice(ti, 1); syncContent()" class="text-red-400 hover:text-red-600 text-xs self-start mt-1">×</button>
-                      </div>
-                      <button @click="block.bodyTexts.push(''); syncContent()" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ 本文を追加</button>
-                      <div>
-                        <label class="text-[10px] font-bold text-slate-400 block mb-1">フッターボタン</label>
-                        <div v-for="(btn, bi) in block.footerButtons" :key="bi" class="flex gap-2 mb-1.5">
-                          <input v-model="btn.label" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ラベル" />
-                          <input v-model="btn.url" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="URL" />
-                          <button v-if="block.footerButtons.length > 1" @click="block.footerButtons.splice(bi, 1); syncContent()" class="text-red-400 hover:text-red-600 text-xs">×</button>
-                        </div>
-                        <button @click="block.footerButtons.push({ label: '', url: '' }); syncContent()" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ ボタン追加</button>
-                      </div>
-                    </div>
-                  </template>
-
-                  <!-- ===== carousel kind ===== -->
-                  <template v-else-if="block.kind === 'carousel'">
-                    <div class="space-y-3">
-                      <div v-for="(card, ci) in block.cards" :key="ci" class="border border-[#ebedf0] rounded-[10px] p-3 group/card relative">
-                        <div class="flex items-center justify-between mb-2">
-                          <span class="text-[10px] font-semibold text-[#9097a1]">カード {{ ci + 1 }} / {{ block.cards.length }}</span>
-                          <button v-if="block.cards.length > 1" @click="removeCarouselCard(block, ci)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity">×</button>
-                        </div>
-                        <div class="space-y-1.5">
-                          <input v-model="card.imageUrl" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL" />
-                          <input v-model="card.title" @input="syncContent" maxlength="40" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトル（最大40文字）" />
-                          <textarea v-model="card.text" @input="syncContent" rows="2" maxlength="60" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="説明テキスト（最大60文字）"></textarea>
-                          <div v-for="(btn, bi) in card.buttons" :key="bi" class="flex gap-1.5">
-                            <input v-model="btn.label" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="ラベル" />
-                            <input v-model="btn.url" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="URL" />
-                          </div>
-                        </div>
-                      </div>
-                      <button @click="addCarouselCard(block)" :disabled="block.cards.length >= 10" class="w-full py-2 border-2 border-dashed border-[#ebedf0] rounded-[10px] text-[10px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors disabled:opacity-40">+ カード追加（最大10枚）</button>
-                    </div>
-                  </template>
-
-                  <!-- ===== imagemap kind ===== -->
-                  <template v-else-if="block.kind === 'imagemap'">
-                    <div class="space-y-3">
-                      <input v-model="block.baseUrl" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ベース画像URL（幅1040px推奨）" />
-                      <div class="flex gap-3">
-                        <label class="flex items-center gap-1.5 text-[10px] text-slate-500">幅 <input type="number" v-model.number="block.baseWidth" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
-                        <label class="flex items-center gap-1.5 text-[10px] text-slate-500">高さ <input type="number" v-model.number="block.baseHeight" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
-                      </div>
-                      <div v-for="(action, ai) in block.actions" :key="ai" class="border border-[#ebedf0] rounded-[10px] p-3 space-y-2">
-                        <div class="flex items-center justify-between">
-                          <span class="text-[10px] font-bold text-slate-500">エリア {{ ai + 1 }}</span>
-                          <button v-if="block.actions.length > 1" @click="removeImageMapAction(block, ai)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center">×</button>
-                        </div>
-                        <div class="grid grid-cols-4 gap-1.5">
-                          <label class="text-[9px] text-slate-500">X <input type="number" v-model.number="action.x" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
-                          <label class="text-[9px] text-slate-500">Y <input type="number" v-model.number="action.y" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
-                          <label class="text-[9px] text-slate-500">幅 <input type="number" v-model.number="action.width" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
-                          <label class="text-[9px] text-slate-500">高さ <input type="number" v-model.number="action.height" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
-                        </div>
-                        <div class="flex gap-2">
-                          <select v-model="action.type" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 bg-white"><option value="uri">URL遷移</option><option value="message">メッセージ送信</option></select>
-                          <input v-model="action.value" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" :placeholder="action.type === 'uri' ? 'https://...' : '送信テキスト'" />
-                        </div>
-                      </div>
-                      <button @click="addImageMapAction(block)" class="w-full py-2 border-2 border-dashed border-[#ebedf0] rounded-[10px] text-[10px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">+ タップエリア追加</button>
-                    </div>
-                  </template>
+              <!-- Node card -->
+              <div :class="['bg-white rounded-[12px] border border-[#e3e5e9] shadow-[0_2px_10px_-4px_rgba(20,24,31,.12)] cursor-move transition-all', selectedLineNodeId === node.id ? 'ring-2 ring-[#4f46e5]/40' : 'hover:shadow-[0_4px_14px_-4px_rgba(20,24,31,.18)]']" @click.stop="selectedLineNodeId = node.id">
+                <div class="flex items-center gap-1.5 px-3 py-[7px] rounded-t-[12px] text-white text-[11px] font-semibold" :style="{ backgroundColor: lineNodeMeta(node.kind).color }">
+                  <span>{{ lineNodeMeta(node.kind).icon }}</span>
+                  <span class="flex-1 truncate">{{ lineNodeMeta(node.kind).label }}</span>
+                  <span class="opacity-70 cursor-grab">⠿</span>
+                </div>
+                <div class="px-3 py-2.5">
+                  <p class="text-[12px] font-semibold text-[#14181f] truncate">
+                    {{ node.kind === 'start' ? node.data.label
+                      : node.kind === 'text' ? (node.data.subBlocks.length ? node.data.subBlocks.length + '件のブロック' : '未設定')
+                      : node.kind === 'flex' ? (node.data.title || 'タイトル未設定')
+                      : node.kind === 'carousel' ? node.data.cards.length + '枚のカード'
+                      : node.kind === 'imagemap' ? (node.data.baseUrl ? '画像設定済み' : '未設定')
+                      : '' }}
+                  </p>
                 </div>
               </div>
+
+              <!-- Output port -->
+              <div class="port absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-[11px] h-[11px] rounded-full bg-white border-2 hover:scale-125 cursor-crosshair z-20 transition-all" :style="{ borderColor: lineNodeMeta(node.kind).color }" @mousedown="startLineConnect(node.id, $event)"></div>
+            </div>
+
+            <!-- Empty hint -->
+            <div v-if="lineNodes.length <= 1" class="absolute top-32 left-1/2 -translate-x-1/2 text-center pointer-events-none">
+              <p class="text-xs text-[#9097a1]">上部のボタンからメッセージノードを追加</p>
+              <p class="text-[10px] text-[#b0b6bf] mt-1">出力ポート(下)から入力ポート(上)へドラッグして接続すると、その順番で配信されます</p>
             </div>
           </div>
 
@@ -450,84 +471,144 @@ const saveScenario = () => {
                 <option value="集客最大化タイプ">集客最大化タイプ</option>
                 <option value="コスト削減タイプ">コスト削減タイプ</option>
               </select>
-              <button @click="saveScenario" :disabled="lineScenarioBlocks.length === 0" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:brightness-110 transition disabled:opacity-40">リテンションシナリオとして保存</button>
+              <button @click="saveScenario" :disabled="lineNodes.length <= 1" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-[7px] text-[12.5px] text-white font-medium hover:brightness-110 transition disabled:opacity-40">リテンションシナリオとして保存</button>
             </div>
           </div>
         </div>
 
-        <!-- LINE Preview -->
-        <div class="w-80 shrink-0 bg-[#f7f8fa] flex flex-col items-center p-6 overflow-y-auto">
-          <span class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] mb-4">LINE プレビュー</span>
-          <div class="w-[280px] bg-[#7494C0] rounded-[2rem] p-3 shadow-xl">
-            <div class="bg-white rounded-2xl overflow-hidden min-h-[400px]">
-              <div class="bg-emerald-500 px-4 py-3 flex items-center gap-2">
-                <div class="w-6 h-6 bg-white/30 rounded-full"></div>
-                <span class="text-white text-xs font-bold">公式アカウント</span>
+        <!-- Right: Node properties panel -->
+        <aside class="w-72 bg-white border-l border-[#ebedf0] overflow-y-auto shrink-0 flex flex-col">
+          <div class="px-4 py-3 border-b border-[#ebedf0] flex items-center justify-between">
+            <h3 class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">ノード設定</h3>
+            <button v-if="selectedLineNode && selectedLineNode.kind !== 'start'" @click="removeLineNode(selectedLineNode.id)" class="text-[10px] text-red-400 hover:text-red-600 font-semibold">削除</button>
+          </div>
+
+          <template v-if="selectedLineNode">
+            <div class="p-4 space-y-4 flex-1">
+              <div class="rounded-[13px] p-3 text-center border border-[#ebedf0]" :style="{ backgroundColor: lineNodeMeta(selectedLineNode.kind).color + '14' }">
+                <span class="text-xl">{{ lineNodeMeta(selectedLineNode.kind).icon }}</span>
+                <div class="text-xs font-semibold mt-1" :style="{ color: lineNodeMeta(selectedLineNode.kind).color }">{{ lineNodeMeta(selectedLineNode.kind).label }}</div>
               </div>
-              <div class="p-3 space-y-2 bg-[#8CABD9] min-h-[340px]">
-                <div v-if="lineScenarioBlocks.length === 0" class="text-center py-8"><p class="text-[10px] text-white/70">メッセージを追加するとプレビュー表示</p></div>
 
-                <template v-for="block in lineScenarioBlocks" :key="block.id">
-                  <!-- text sub-blocks preview -->
-                  <template v-if="block.kind === 'text'">
-                    <template v-for="sub in block.subBlocks" :key="sub.id">
-                      <div v-if="sub.type === 'text' && sub.text" class="flex justify-start"><div class="bg-white rounded-2xl rounded-tl-sm px-3 py-2 max-w-[220px] shadow-sm"><p class="text-[11px] text-slate-800 whitespace-pre-wrap break-words">{{ sub.text }}</p></div></div>
-                      <div v-if="sub.type === 'image' && sub.url" class="flex justify-start"><div class="bg-white rounded-2xl rounded-tl-sm overflow-hidden max-w-[220px] shadow-sm"><img :src="sub.url" class="w-full object-cover" /></div></div>
-                      <div v-if="sub.type === 'button' && sub.label" class="flex justify-start"><div class="bg-white rounded-2xl rounded-tl-sm overflow-hidden max-w-[220px] shadow-sm w-full"><div class="px-3 py-2.5 text-center"><span class="text-[11px] font-bold text-emerald-600">{{ sub.label }}</span></div></div></div>
-                    </template>
-                  </template>
+              <!-- Start -->
+              <template v-if="selectedLineNode.kind === 'start'">
+                <p class="text-[11px] text-[#9097a1] leading-relaxed">ここから配信が始まります。次のノードをつないでシナリオを組み立てましょう。</p>
+              </template>
 
-                  <!-- flex preview -->
-                  <div v-else-if="block.kind === 'flex'" class="flex justify-start">
-                    <div class="bg-white rounded-[13px] overflow-hidden shadow-sm w-[240px]">
-                      <img v-if="block.heroImage" :src="block.heroImage" class="w-full h-28 object-cover" @error="$event.target.style.display='none'" />
-                      <div v-else class="h-20 bg-gradient-to-br from-emerald-50 to-slate-100 flex items-center justify-center text-slate-300 text-xs">Hero Image</div>
-                      <div class="p-3">
-                        <p class="text-xs font-bold text-slate-900">{{ block.title || 'タイトル' }}</p>
-                        <p v-if="block.subtitle" class="text-[10px] text-slate-400 mt-0.5">{{ block.subtitle }}</p>
-                        <p v-for="(t, i) in block.bodyTexts" :key="i" class="text-[10px] text-slate-600 mt-1.5 leading-relaxed">{{ t || '本文テキスト' }}</p>
-                      </div>
-                      <div v-if="block.footerButtons.some(b => b.label)" class="border-t border-slate-100">
-                        <template v-for="(btn, i) in block.footerButtons" :key="i">
-                          <div v-if="btn.label" class="text-center py-2 border-b border-slate-50 last:border-b-0"><span class="text-[11px] font-bold text-emerald-600">{{ btn.label }}</span></div>
-                        </template>
+              <!-- Text -->
+              <template v-if="selectedLineNode.kind === 'text'">
+                <div class="flex gap-2">
+                  <button v-for="bt in [{type:'text',label:'テキスト',icon:'📝'},{type:'image',label:'画像',icon:'🖼'},{type:'button',label:'ボタン',icon:'🔘'}]" :key="bt.type" @click="addSubBlock(selectedLineNode, bt.type)" class="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold text-[#3a3f47] bg-white border border-[#e6e8ec] rounded-[7px] hover:bg-[#f1f2f4] transition-colors">
+                    <span>{{ bt.icon }}</span> {{ bt.label }}
+                  </button>
+                </div>
+                <div v-if="selectedLineNode.data.subBlocks.length === 0" class="text-center py-6 text-[11px] text-slate-300">テキスト・画像・ボタンを追加してください</div>
+                <div class="space-y-2.5">
+                  <div v-for="(sub, si) in selectedLineNode.data.subBlocks" :key="sub.id" class="bg-[#f7f8fa] border border-[#ebedf0] rounded-[10px] p-3 relative group/sub">
+                    <button @click="removeSubBlock(selectedLineNode, si)" class="absolute top-2 right-2 w-5 h-5 rounded text-[10px] bg-white text-red-400 hover:text-red-600 flex items-center justify-center opacity-0 group-hover/sub:opacity-100 transition-opacity">×</button>
+                    <textarea v-if="sub.type === 'text'" v-model="sub.text" @input="syncContent" rows="2" class="w-full bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition resize-none" placeholder="メッセージテキスト"></textarea>
+                    <input v-if="sub.type === 'image'" v-model="sub.url" @input="syncContent" class="w-full bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL（https://...）" />
+                    <div v-if="sub.type === 'button'" class="flex gap-2">
+                      <input v-model="sub.label" @input="syncContent" class="flex-1 bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ボタンラベル" />
+                      <input v-model="sub.url" @input="syncContent" class="flex-1 bg-white border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="リンクURL" />
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Flex -->
+              <template v-if="selectedLineNode.kind === 'flex'">
+                <div class="space-y-3">
+                  <input v-model="selectedLineNode.data.heroImage" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ヒーロー画像URL（任意）" />
+                  <input v-model="selectedLineNode.data.title" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトル" />
+                  <input v-model="selectedLineNode.data.subtitle" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="サブタイトル（任意）" />
+                  <div v-for="(_, ti) in selectedLineNode.data.bodyTexts" :key="ti" class="flex gap-2">
+                    <textarea v-model="selectedLineNode.data.bodyTexts[ti]" @input="syncContent" rows="2" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="本文テキスト"></textarea>
+                    <button v-if="selectedLineNode.data.bodyTexts.length > 1" @click="selectedLineNode.data.bodyTexts.splice(ti, 1); syncContent()" class="text-red-400 hover:text-red-600 text-xs self-start mt-1">×</button>
+                  </div>
+                  <button @click="selectedLineNode.data.bodyTexts.push(''); syncContent()" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ 本文を追加</button>
+                  <div>
+                    <label class="text-[10px] font-bold text-slate-400 block mb-1">フッターボタン</label>
+                    <div v-for="(btn, bi) in selectedLineNode.data.footerButtons" :key="bi" class="flex gap-2 mb-1.5">
+                      <input v-model="btn.label" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ラベル" />
+                      <input v-model="btn.url" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="URL" />
+                      <button v-if="selectedLineNode.data.footerButtons.length > 1" @click="selectedLineNode.data.footerButtons.splice(bi, 1); syncContent()" class="text-red-400 hover:text-red-600 text-xs">×</button>
+                    </div>
+                    <button @click="selectedLineNode.data.footerButtons.push({ label: '', url: '' }); syncContent()" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800">+ ボタン追加</button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Carousel -->
+              <template v-if="selectedLineNode.kind === 'carousel'">
+                <div class="space-y-3">
+                  <div v-for="(card, ci) in selectedLineNode.data.cards" :key="ci" class="border border-[#ebedf0] rounded-[10px] p-3 group/card relative">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-[10px] font-semibold text-[#9097a1]">カード {{ ci + 1 }} / {{ selectedLineNode.data.cards.length }}</span>
+                      <button v-if="selectedLineNode.data.cards.length > 1" @click="removeCarouselCard(selectedLineNode, ci)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity">×</button>
+                    </div>
+                    <div class="space-y-1.5">
+                      <input v-model="card.imageUrl" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="画像URL" />
+                      <input v-model="card.title" @input="syncContent" maxlength="40" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="タイトル（最大40文字）" />
+                      <textarea v-model="card.text" @input="syncContent" rows="2" maxlength="60" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[8px] px-2.5 py-1.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="説明テキスト（最大60文字）"></textarea>
+                      <div v-for="(btn, bi) in card.buttons" :key="bi" class="flex gap-1.5">
+                        <input v-model="btn.label" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="ラベル" />
+                        <input v-model="btn.url" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="URL" />
                       </div>
                     </div>
                   </div>
+                  <button @click="addCarouselCard(selectedLineNode)" :disabled="selectedLineNode.data.cards.length >= 10" class="w-full py-2 border-2 border-dashed border-[#ebedf0] rounded-[10px] text-[10px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors disabled:opacity-40">+ カード追加（最大10枚）</button>
+                </div>
+              </template>
 
-                  <!-- carousel preview -->
-                  <div v-else-if="block.kind === 'carousel'" class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 snap-x" style="scrollbar-width:thin">
-                    <div v-for="(card, ci) in block.cards" :key="ci" class="bg-white rounded-[13px] overflow-hidden shadow-sm min-w-[180px] max-w-[180px] shrink-0 snap-start">
-                      <div v-if="card.imageUrl" class="h-24 bg-slate-100"><img :src="card.imageUrl" class="w-full h-full object-cover" @error="$event.target.style.display='none'" /></div>
-                      <div v-else class="h-24 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-[10px] text-slate-300">画像</div>
-                      <div class="p-2.5">
-                        <p class="text-[11px] font-bold text-slate-900 truncate">{{ card.title || 'タイトル' }}</p>
-                        <p class="text-[9px] text-slate-500 mt-0.5 line-clamp-2">{{ card.text || 'テキスト' }}</p>
-                      </div>
-                      <template v-for="(btn, bi) in card.buttons" :key="bi">
-                        <div v-if="btn.label" class="text-center py-1.5 border-t border-slate-100"><span class="text-[10px] font-bold text-emerald-600">{{ btn.label }}</span></div>
-                      </template>
+              <!-- ImageMap -->
+              <template v-if="selectedLineNode.kind === 'imagemap'">
+                <div class="space-y-3">
+                  <input v-model="selectedLineNode.data.baseUrl" @input="syncContent" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition" placeholder="ベース画像URL（幅1040px推奨）" />
+                  <div class="flex gap-3">
+                    <label class="flex items-center gap-1.5 text-[10px] text-slate-500">幅 <input type="number" v-model.number="selectedLineNode.data.baseWidth" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
+                    <label class="flex items-center gap-1.5 text-[10px] text-slate-500">高さ <input type="number" v-model.number="selectedLineNode.data.baseHeight" class="w-16 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] text-center" /></label>
+                  </div>
+                  <div v-for="(action, ai) in selectedLineNode.data.actions" :key="ai" class="border border-[#ebedf0] rounded-[10px] p-3 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[10px] font-bold text-slate-500">エリア {{ ai + 1 }}</span>
+                      <button v-if="selectedLineNode.data.actions.length > 1" @click="removeImageMapAction(selectedLineNode, ai)" class="w-5 h-5 rounded text-[10px] bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center">×</button>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1.5">
+                      <label class="text-[9px] text-slate-500">X <input type="number" v-model.number="action.x" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
+                      <label class="text-[9px] text-slate-500">Y <input type="number" v-model.number="action.y" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
+                      <label class="text-[9px] text-slate-500">幅 <input type="number" v-model.number="action.width" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
+                      <label class="text-[9px] text-slate-500">高さ <input type="number" v-model.number="action.height" class="w-full bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-1.5 py-1 text-[10px] mt-0.5" /></label>
+                    </div>
+                    <div class="flex gap-2">
+                      <select v-model="action.type" class="text-[10px] bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 bg-white"><option value="uri">URL遷移</option><option value="message">メッセージ送信</option></select>
+                      <input v-model="action.value" @input="syncContent" class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[7px] px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20" :placeholder="action.type === 'uri' ? 'https://...' : '送信テキスト'" />
                     </div>
                   </div>
+                  <button @click="addImageMapAction(selectedLineNode)" class="w-full py-2 border-2 border-dashed border-[#ebedf0] rounded-[10px] text-[10px] font-bold text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">+ タップエリア追加</button>
+                </div>
+              </template>
 
-                  <!-- imagemap preview -->
-                  <div v-else-if="block.kind === 'imagemap'" class="flex justify-start">
-                    <div class="relative w-[240px] rounded-[13px] overflow-hidden shadow-sm">
-                      <img v-if="block.baseUrl" :src="block.baseUrl" class="w-full" @error="$event.target.style.display='none'" />
-                      <div v-else class="h-40 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-[10px] text-slate-400">画像を設定してください</div>
-                      <template v-if="block.baseUrl">
-                        <div v-for="(action, ai) in block.actions" :key="ai" class="absolute border-2 border-white/60 bg-white/10 flex items-center justify-center backdrop-blur-[1px]" :style="{ left: (action.x / block.baseWidth * 100) + '%', top: (action.y / block.baseHeight * 100) + '%', width: (action.width / block.baseWidth * 100) + '%', height: (action.height / block.baseHeight * 100) + '%' }">
-                          <span class="text-[8px] bg-black/50 text-white px-1.5 py-0.5 rounded font-bold">{{ action.label || ai + 1 }}</span>
-                        </div>
-                      </template>
-                    </div>
-                  </div>
-                </template>
-
+              <!-- Connection info -->
+              <div v-if="selectedLineNode.kind !== 'start' || true">
+                <label class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em] block mb-1">接続先</label>
+                <div v-for="(conn, ci) in lineConnections.filter(c => c.from === selectedLineNode.id)" :key="ci" class="flex items-center justify-between bg-[#f7f8fa] border border-[#eef0f2] rounded-[7px] px-3 py-1.5 mb-1">
+                  <span class="text-[10px] text-[#3a3f47] flex items-center gap-1">
+                    <span class="text-xs">{{ lineNodeMeta(lineNodes.find(n => n.id === conn.to)?.kind)?.icon }}</span>
+                    {{ lineNodeMeta(lineNodes.find(n => n.id === conn.to)?.kind)?.label }}
+                  </span>
+                  <button @click="removeLineConnection(lineConnections.indexOf(conn))" class="text-red-400 hover:text-red-600 text-[10px]">×</button>
+                </div>
+                <p v-if="lineConnections.filter(c => c.from === selectedLineNode.id).length === 0" class="text-[10px] text-[#b0b6bf]">出力ポートからドラッグで接続</p>
               </div>
             </div>
+          </template>
+
+          <div v-else class="flex-1 flex flex-col items-center justify-center p-4 text-center">
+            <div class="text-2xl mb-2">👆</div>
+            <p class="text-[11px] text-[#9097a1]">ノードを選択して<br/>設定を編集</p>
           </div>
-        </div>
+        </aside>
       </template>
 
       <!-- ==================== Email Editor ==================== -->

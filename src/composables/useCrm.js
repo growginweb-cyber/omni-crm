@@ -57,10 +57,6 @@ export function useCrm() {
   const newQuestionText = ref('')
   const isCreatingQuestion = ref(false)
 
-  const liffSelectedCustomerId = ref('')
-  const liffAnswers = ref({})
-  const isLiffSubmitting = ref(false)
-
   const stepAiPrompt = ref('')
   const stepAiResult = ref('')
   const stepAiLoading = ref(false)
@@ -814,60 +810,6 @@ export function useCrm() {
     })
   }
 
-  const handleLiffSubmit = async () => {
-    if (!liffSelectedCustomerId.value) {
-      alert('顧客を選択してください')
-      return
-    }
-    let finalSegment = '未診断'
-    if (surveyQuestions.value && surveyQuestions.value.length > 0) {
-      for (const q of surveyQuestions.value) {
-        const selectedChoiceId = liffAnswers.value[q.id]
-        if (selectedChoiceId) {
-          const choice = q.survey_choices?.find((c) => c.id === selectedChoiceId)
-          if (choice) finalSegment = choice.assigned_segment
-        }
-      }
-    } else {
-      finalSegment = liffAnswers.value['q1'] === 'choice_1' ? '集客最大化タイプ' : 'コスト削減タイプ'
-    }
-
-    isLiffSubmitting.value = true
-    try {
-      await supabase.from('customers').update({ segment: finalSegment }).eq('id', liffSelectedCustomerId.value)
-
-      const now = new Date()
-      const insertData = stepScenarios.value.map((scenario) => {
-        const scheduledTime = new Date(now.getTime() + scenario.delay_minutes * 60 * 1000).toISOString()
-        return {
-          tenant_id: currentTenantId.value,
-          customer_id: liffSelectedCustomerId.value,
-          step_number: scenario.step_number,
-          delivery_channel: scenario.delivery_channel,
-          template_id: scenario.template_id || null,
-          scheduled_at: scheduledTime,
-          status: '未送信',
-        }
-      })
-
-      if (insertData.length > 0) {
-        const { error: insertError } = await supabase.from('step_broadcast_queues').insert(insertData)
-        if (insertError) throw insertError
-      }
-
-      alert(
-        `🎯 診断完了！セグメント【${finalSegment}】になりました。\n🚀 設計された ${insertData.length} 個の自動追客ステップが予約されました！`
-      )
-      liffAnswers.value = {}
-      activeTab.value = 'customers'
-      await Promise.all([fetchCustomers(), fetchStepQueues()])
-    } catch (e) {
-      alert(e.message)
-    } finally {
-      isLiffSubmitting.value = false
-    }
-  }
-
   const simulateAIGeneration = () => {
     if (!aiPurpose.value) return
     isGenerating.value = true
@@ -1182,9 +1124,6 @@ export function useCrm() {
     newCampaignTitle,
     newQuestionText,
     isCreatingQuestion,
-    liffSelectedCustomerId,
-    liffAnswers,
-    isLiffSubmitting,
     totalStats,
     channelStats,
     fetchCustomers,
@@ -1199,7 +1138,6 @@ export function useCrm() {
     handleCreateQuestion,
     handleAddChoice,
     addScenarioStep,
-    handleLiffSubmit,
     simulateAIGeneration,
     deleteTemplate,
     saveTemplate,

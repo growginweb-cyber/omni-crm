@@ -49,12 +49,6 @@ const navGroups = [
     ],
   },
   {
-    label: 'テスト',
-    items: [
-      { id: 'user-liff', label: 'LIFF体験', icon: '📱' },
-    ],
-  },
-  {
     label: '設定',
     items: [
       { id: 'settings', label: '設定', icon: '⚙️' },

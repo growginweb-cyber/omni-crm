@@ -9,7 +9,6 @@ import ScenariosTab from './components/tabs/ScenariosTab.vue'
 import SurveyTab from './components/tabs/SurveyTab.vue'
 import AiContentTab from './components/tabs/AiContentTab.vue'
 import BroadcastTab from './components/tabs/BroadcastTab.vue'
-import UserLiffTab from './components/tabs/UserLiffTab.vue'
 import AnalyticsTab from './components/tabs/AnalyticsTab.vue'
 import InboxTab from './components/tabs/InboxTab.vue'
 import CalendarTab from './components/tabs/CalendarTab.vue'
@@ -206,18 +205,6 @@ const crm = useCrm()
         @update:broadcastTargetSavedSegmentId="crm.broadcastTargetSavedSegmentId.value = $event"
         @reserve="crm.handleReserveBroadcast"
         @execute="crm.handleExecuteBroadcast"
-      />
-
-      <UserLiffTab
-        v-else-if="crm.activeTab.value === 'user-liff'"
-        :customers="crm.customers.value"
-        :surveyQuestions="crm.surveyQuestions.value"
-        :liffSelectedCustomerId="crm.liffSelectedCustomerId.value"
-        :liffAnswers="crm.liffAnswers.value"
-        :isLiffSubmitting="crm.isLiffSubmitting.value"
-        @update:liffSelectedCustomerId="crm.liffSelectedCustomerId.value = $event"
-        @update:liffAnswers="crm.liffAnswers.value = $event"
-        @submit="crm.handleLiffSubmit"
       />
 
       <SettingsTab
