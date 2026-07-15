@@ -518,6 +518,39 @@ export function useCrm() {
     if (m) m.display_name = name
   }
 
+  // --- チーム招待 ---
+  const tenantInvites = ref([])
+
+  const fetchTenantInvites = async () => {
+    if (!currentTenantId.value) return
+    const { data } = await supabase
+      .from('tenant_invites')
+      .select('*')
+      .eq('tenant_id', currentTenantId.value)
+      .order('created_at', { ascending: false })
+    tenantInvites.value = data || []
+  }
+
+  const inviteTeamMember = async (email) => {
+    const trimmed = email?.trim().toLowerCase()
+    if (!trimmed || !currentTenantId.value) return
+    const { error } = await supabase.from('tenant_invites').insert([{
+      tenant_id: currentTenantId.value,
+      email: trimmed,
+      invited_by: currentUserId.value,
+    }])
+    if (error) {
+      alert(error.code === '23505' ? 'このメールアドレスは既に招待済みです' : error.message)
+      return
+    }
+    await fetchTenantInvites()
+  }
+
+  const cancelTenantInvite = async (id) => {
+    await supabase.from('tenant_invites').delete().eq('id', id)
+    tenantInvites.value = tenantInvites.value.filter(i => i.id !== id)
+  }
+
   // --- 外部CRM/ATS連携（接続先未定のため汎用スキーマ） ---
   const integrationConfigs = ref([])
 
@@ -646,6 +679,7 @@ export function useCrm() {
         fetchIntegrationConfigs(),
         fetchTagGroups(),
         fetchTagDefinitions(),
+        fetchTenantInvites(),
       ])
       await fetchScenarioDefs()
       await fetchTeamMembers()
@@ -1197,6 +1231,9 @@ export function useCrm() {
     engagementScore,
     currentUserId,
     updateMyDisplayName,
+    tenantInvites,
+    inviteTeamMember,
+    cancelTenantInvite,
     integrationConfigs,
     saveIntegrationConfig,
     toggleIntegrationConfig,

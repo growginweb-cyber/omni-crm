@@ -1,13 +1,14 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const props = defineProps({
   userEmail: String,
   teamMembers: Array,
   currentUserId: String,
   integrationConfigs: Array,
+  tenantInvites: Array,
 })
-const emit = defineEmits(['updateDisplayName', 'saveIntegration', 'toggleIntegration', 'deleteIntegration'])
+const emit = defineEmits(['updateDisplayName', 'saveIntegration', 'toggleIntegration', 'deleteIntegration', 'inviteMember', 'cancelInvite'])
 
 const myName = ref('')
 const me = () => (props.teamMembers || []).find(m => m.id === props.currentUserId)
@@ -15,6 +16,14 @@ const me = () => (props.teamMembers || []).find(m => m.id === props.currentUserI
 const saveMyName = () => {
   if (!myName.value.trim()) return
   emit('updateDisplayName', myName.value)
+}
+
+const newInviteEmail = ref('')
+const pendingInvites = computed(() => (props.tenantInvites || []).filter(i => !i.accepted))
+const sendInvite = () => {
+  if (!newInviteEmail.value.trim()) return
+  emit('inviteMember', newInviteEmail.value)
+  newInviteEmail.value = ''
 }
 
 const providerOptions = [
@@ -70,6 +79,31 @@ const providerLabel = (v) => providerOptions.find(p => p.value === v)?.label || 
             <span v-if="m.id === currentUserId" class="text-[10.5px] font-semibold text-[#4f46e5] bg-[#ececfd] rounded-full px-2 py-0.5">自分</span>
           </div>
           <div v-if="!teamMembers || teamMembers.length === 0" class="px-[18px] py-6 text-center text-[11px] text-[#9097a1]">メンバーがいません</div>
+        </div>
+
+        <!-- 招待中 -->
+        <div v-if="pendingInvites.length > 0" class="bg-white border border-[#ebedf0] rounded-[13px] overflow-hidden mt-3">
+          <div v-for="inv in pendingInvites" :key="inv.id" class="flex items-center gap-3 px-[18px] py-3 border-b border-[#f4f5f6] last:border-0">
+            <div class="w-8 h-8 rounded-full bg-[#f1f2f4] flex items-center justify-center text-[#9097a1] text-xs shrink-0">✉</div>
+            <span class="text-[12.5px] font-medium flex-1 text-[#3a3f47]">{{ inv.email }}</span>
+            <span class="text-[10.5px] font-semibold text-[#b45309] bg-amber-50 rounded-full px-2 py-0.5 shrink-0">招待中</span>
+            <button @click="$emit('cancelInvite', inv.id)" class="text-[#c2c7cf] hover:text-red-500 text-xs shrink-0">✕</button>
+          </div>
+        </div>
+
+        <div class="bg-white border border-[#ebedf0] rounded-[13px] p-[18px] flex flex-col gap-2.5 mt-3">
+          <div class="text-[11px] font-semibold text-[#9097a1] uppercase tracking-[.04em]">＋ メンバーを招待</div>
+          <div class="flex gap-2">
+            <input
+              v-model="newInviteEmail"
+              @keydown.enter="sendInvite"
+              type="email"
+              placeholder="member@example.com"
+              class="flex-1 bg-[#f7f8fa] border border-[#ebedf0] rounded-[9px] px-3 py-2.5 text-[12.5px] focus:outline-none focus:border-[#4f46e5]"
+            />
+            <button @click="sendInvite" class="bg-[#4f46e5] rounded-[9px] px-3.5 py-2 text-[12.5px] text-white font-semibold hover:brightness-110 transition shrink-0">招待</button>
+          </div>
+          <p class="text-[10.5px] text-[#9097a1] leading-relaxed">招待するとこのメールアドレスが登録待ちになります。招待済みのメールで新規ログインアカウントが作成されると、自動的にこのワークスペースに参加します。</p>
         </div>
       </section>
 

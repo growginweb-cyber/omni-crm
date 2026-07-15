@@ -213,10 +213,13 @@ const crm = useCrm()
         :teamMembers="crm.teamMembers.value"
         :currentUserId="crm.currentUserId.value"
         :integrationConfigs="crm.integrationConfigs.value"
+        :tenantInvites="crm.tenantInvites.value"
         @updateDisplayName="crm.updateMyDisplayName"
         @saveIntegration="crm.saveIntegrationConfig"
         @toggleIntegration="crm.toggleIntegrationConfig"
         @deleteIntegration="crm.deleteIntegrationConfig"
+        @inviteMember="crm.inviteTeamMember"
+        @cancelInvite="crm.cancelTenantInvite"
       />
     </div>
 
